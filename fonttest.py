@@ -1,6 +1,7 @@
 import libtcodpy as libtcod
-
-
+##################################################################################
+##A file for the developer to use to test and keep track of icons in the fontmap.##
+##################################################################################
 def main():
 	screen_width = 80
 	screen_height = 50
