@@ -1,7 +1,7 @@
 # AlienRaid
  A roguelike RPG coded with python3/libtcod. You are Wrpgnyth, an alien from the Planet Zoltron who has crash landed on earth in the Australian Outback. The wildlife is trying to kill you. The object of the game is to dive as deep as possible. Good luck! 
  
- Movement keys are (view in plain text editor, github makes this look really wonky):
+ Movement keys are (Ideally viewed in raw text format, github makes this look really wonky):
  
  y   k   u
  
