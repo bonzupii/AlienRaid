@@ -23,23 +23,23 @@ def handle_player_turn_keys(key):
 	key_char = chr(key.c)
 	
 	# Movement keys
-	if key.vk == libtcod.KEY_UP or key_char == 'k' or key_char == '8': # UP
+	if key.vk == libtcod.KEY_UP or key_char == 'k': # UP
 		return {'move': (0, -1)}
-	elif key.vk == libtcod.KEY_DOWN or key_char == 'j' or key_char == '2': # DOWN
+	elif key.vk == libtcod.KEY_DOWN or key_char == 'j': # DOWN
 		return {'move': (0, 1)}
-	elif key.vk == libtcod.KEY_LEFT or key_char == 'h' or key_char == '4': # LEFT
+	elif key.vk == libtcod.KEY_LEFT or key_char == 'h': # LEFT
 		return {'move': (-1, 0)}
-	elif key.vk == libtcod.KEY_RIGHT or key_char == 'l' or key_char == '6': # RIGHT
+	elif key.vk == libtcod.KEY_RIGHT or key_char == 'l': # RIGHT
 		return {'move': (1, 0)} 
-	elif key_char == 'y' or key_char == '7': # UP LEFT
+	elif key_char == 'y': # UP LEFT
 		return {'move': (-1, -1)}
-	elif key_char == 'u' or key_char == '9': # UP RIGHT
+	elif key_char == 'u': # UP RIGHT
 		return {'move': (1, -1)}
-	elif key_char == 'b' or key_char == '1': # DOWN LEFT
+	elif key_char == 'b': # DOWN LEFT
 		return {'move': (-1, 1)}
-	elif key_char == 'n' or key_char == '3': # DOWN RIGHT
+	elif key_char == 'n': # DOWN RIGHT
 		return {'move': (1, 1)}
-	elif key_char == 'z' or key_char == '5': # HOLD POSITION FOR 1 TURN
+	elif key_char == 'z': # HOLD POSITION FOR 1 TURN
 		return {'wait': True}
 
 	if key_char == 'g':
