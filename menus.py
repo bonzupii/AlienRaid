@@ -54,8 +54,6 @@ def main_menu(con, background_image, screen_width, screen_height):
 	libtcod.console_print_ex(0, int(screen_width / 2), int(screen_height / 2) - 4, libtcod.BKGND_NONE, libtcod.CENTER, 'ALIEN RAID')
 	libtcod.console_print_ex(0, int(screen_width / 2), int(screen_height - 2), libtcod.BKGND_NONE, libtcod.CENTER, 'By Bonzu Pippinpaddlopsikopolis III')
 	libtcod.console_print_ex(0, int(screen_width / 2), int(screen_height - 6), libtcod.BKGND_NONE, libtcod.CENTER, 'Please see the readme.txt file to learn about game controls and receive general advice about how to play the game.')
-	libtcod.console_print_ex(0, int(screen_width / 2), int(screen_height - 4), libtcod.BKGND_NONE, libtcod.CENTER, 'TO-DO LIST: Write readme.txt file')
-
 	menu(con, '', ['Play a new game', 'Continue last game', 'Quit'], 24,  screen_width, screen_height)
 	
 def level_up_menu(con, header, player, menu_width, screen_width, screen_height):
