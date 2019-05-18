@@ -3,7 +3,7 @@ A roguelike RPG coded with python3/libtcod. You are Wrpgnyth, an alien from the 
 
 To run the game in linux, open a terminal and cd into the game directory, then run:
 
-run "pip install tcod" or use your package manager to install python-libtcod
+run "pip install tcod" or "pip3 install tcod"
 
 ./launcher.py
 
