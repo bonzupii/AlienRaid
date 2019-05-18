@@ -1,4 +1,4 @@
-import libtcodpy as libtcod
+import tcod as libtcod
 ##################################################################################
 ##A file for the developer to use to test and keep track of icons in the fontmap.##
 ##################################################################################

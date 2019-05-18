@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import libtcodpy as libtcod
+import tcod as libtcod
 from random import randint
 
 from components.ai import BasicMonster

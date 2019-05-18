@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import libtcodpy as libtcod
+import tcod as libtcod
 
 from components.ai import StunnedMonster
 from components.game_messages import Message

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import libtcodpy as libtcod
+import tcod as libtcod
 
 import textwrap
 

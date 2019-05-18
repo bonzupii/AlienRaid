@@ -3,13 +3,13 @@ A roguelike RPG coded with python3/libtcod. You are Wrpgnyth, an alien from the 
 
 To run the game in linux, open a terminal and cd into the game directory, then run:
 
+run "pip install tcod" or use your package manager to install python-libtcod
+
 ./launcher.py
 
 or
 
 python3 launcher.py
-
-If you get an error message saying launcher.py isn't excecutable, run "chmod +x launcher.py" then run "./launcher.py" again.
 
 
 To run the game in windows:
@@ -18,7 +18,9 @@ Make sure you have python 3.5+ installed.
 
 Open a command prompt or power shell then cd into the game directory.
 
-Run "python launcher.py".
+Run "py -m pip install tcod" to install libtcod
+
+Run "python launcher.py" to excecute the game
 
 This game has worked on windows but it is not officially supported by the game developer. If you have problems running it in windows, holler at me on Freenode in #roguelikedev. The name is Bonzu. We'll try and see if we can get it working for you, but no promises.
 
@@ -55,7 +57,5 @@ Esc (when in game screen or main menu) - Quit game.
 Esc (when in character menu, inventory menu or when targetting) - Cancel/Close menu.
 
 . (When standing on a trail) - Take trail to the next level. Once you advance, you can not go back.
-
-If you are having trouble with the including libtcod libraries, try running "pip3 install tcod" and then delete the directory "libtcodpy" from the base game directory, then delete libtcod.so, libtcod.so.0, libtcod.so.0.0.0, libtcod.dll, libtcod-gui.dll and SDL2.dll from the base game directory.
 
 More monsters, items and equipment types to come! Have fun and good luck!
