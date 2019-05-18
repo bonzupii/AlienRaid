@@ -3,13 +3,17 @@ A roguelike RPG coded with python3/libtcod. You are Wrpgnyth, an alien from the 
 
 To run the game in linux, open a terminal and cd into the game directory, then run:
 
-run "pip3 install tcod"
+run "pip3 install tcod" to install libtcod
 
+
+Then to launch the game run
+ 
 ./launcher.py
 
 or
 
 python3 launcher.py
+
 
 
 To run the game in windows:
@@ -32,7 +36,7 @@ Movement keys are (Ideally viewed in raw text format, github makes this look rea
  
  h - z - l
  
- /  |  \
+ /   |  \
  
  b   j   n
  
