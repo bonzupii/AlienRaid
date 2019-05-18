@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import libtcodpy as libtcod
 
-from game_states import GameStates
+from components.game_states import GameStates
 
 def handle_keys(key, game_state):
 	if game_state == GameStates.PLAYERS_TURN:

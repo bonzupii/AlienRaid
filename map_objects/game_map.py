@@ -8,17 +8,16 @@ from components.equippable import Equippable
 from components.fighter import Fighter
 from components.item import Item
 from components.trail import Trail
+from components.entity import Entity
+from components.game_messages import Message
+from components.game_states import GameStates
 
-from entity import Entity
-from game_messages import Message
-from game_states import GameStates
-
-from item_functions import use_stun_grenade, use_plasma_grenade, use_shock_charge, heal, morphine_pack ,use_ray_gun
-from render_functions import RenderOrder
+from functions.item_functions import use_stun_grenade, use_plasma_grenade, use_shock_charge, heal, morphine_pack ,use_ray_gun
+from functions.render_functions import RenderOrder
 
 from map_objects.rectangle import Rect
 from map_objects.tile import Tile
-from random_utils import from_dungeon_level, random_choice_from_dict
+from loader_functions.random_utils import from_dungeon_level, random_choice_from_dict
 
 class GameMap:
 	def __init__(self, width, height, dungeon_level=1):

@@ -3,13 +3,13 @@ A roguelike RPG coded with python3/libtcod. You are Wrpgnyth, an alien from the 
 
 To run the game in linux, open a terminal and cd into the game directory, then run:
 
-./engine.py
+./launcher.py
 
 or
 
-python3 engine.py
+python3 launcher.py
 
-If you get an error message saying engine.py isn't excecutable, run "chmod +x engine.py" then run "./engine.py" again.
+If you get an error message saying launcher.py isn't excecutable, run "chmod +x launcher.py" then run "./launcher.py" again.
 
 
 To run the game in windows:
@@ -18,7 +18,7 @@ Make sure you have python 3.5+ installed.
 
 Open a command prompt or power shell then cd into the game directory.
 
-Run "python engine.py".
+Run "python launcher.py".
 
 This game has worked on windows but it is not officially supported by the game developer. If you have problems running it in windows, holler at me on Freenode in #roguelikedev. The name is Bonzu. We'll try and see if we can get it working for you, but no promises.
 

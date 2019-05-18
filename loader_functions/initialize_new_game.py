@@ -7,11 +7,12 @@ from components.fighter import Fighter
 from components.inventory import Inventory
 from components.level import Level
 
-from entity import Entity
-from equipment_slots import EquipmentSlots
-from game_messages import MessageLog
-from game_states import GameStates
-from render_functions import RenderOrder
+from components.entity import Entity
+from components.equipment_slots import EquipmentSlots
+from components.game_messages import MessageLog
+from components.game_states import GameStates
+
+from functions.render_functions import RenderOrder
 
 from map_objects.game_map import GameMap
 

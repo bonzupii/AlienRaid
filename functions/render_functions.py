@@ -2,8 +2,8 @@
 import libtcodpy as libtcod
 
 from enum import Enum
-from game_states import GameStates
-from menus import character_screen, inventory_menu, level_up_menu
+from components.game_states import GameStates
+from components.menus import character_screen, inventory_menu, level_up_menu
 
 
 class RenderOrder(Enum):

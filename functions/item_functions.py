@@ -3,8 +3,8 @@
 import libtcodpy as libtcod
 
 from components.ai import StunnedMonster
-from game_messages import Message
-from game_states import GameStates
+from components.game_messages import Message
+from components.game_states import GameStates
 from random import randint
 
 def heal(*args, **kwargs):

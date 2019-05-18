@@ -3,7 +3,7 @@ import libtcodpy as libtcod
 
 from random import randint
 
-from game_messages import Message
+from components.game_messages import Message
 
 
 class BasicMonster:

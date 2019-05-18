@@ -2,7 +2,7 @@ import os
 
 import shelve
 
-from game_states import GameStates
+from components.game_states import GameStates
 
 
 def save_game(player, entities, game_map, message_log, game_state):
