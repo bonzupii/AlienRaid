@@ -166,7 +166,7 @@ class GameMap:
 					statbase = randint(15, 20) + self.dungeon_level
 					rand_hp = statbase * 15
 					rand_def = statbase
-					rand_power = statbase * 3
+					rand_power = round(statbase * 3.5)
 					rand_xp = statbase * 3
 					fighter_component = Fighter(hp=rand_hp, defense=rand_def, power=rand_power, xp=rand_xp)
 					ai_component = BasicMonster()

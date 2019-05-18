@@ -55,6 +55,7 @@ def play_game(player, entities, game_map, message_log, game_state, con, panel, c
 		take_trail = action.get('take_trail')
 		level_up = action.get('level_up')
 		show_character_screen = action.get('show_character_screen')
+		checkpoint = action.get('checkpoint')
 		exit = action.get('exit')
 		fullscreen = action.get('fullscreen')
 
@@ -197,6 +198,10 @@ def play_game(player, entities, game_map, message_log, game_state, con, panel, c
 				player_turn_results.extend(item_use_results)
 			elif right_click:
 				player_turn_results.append({'targeting_cancelled': True})
+				
+		if checkpoint:
+			save_game(player, entities, game_map, message_log, game_state)
+			message_log.add_message(Message('Your game has been saved.', libtcod.green))
 
 		if exit:
 			if game_state in (GameStates.SHOW_INVENTORY, GameStates.DROP_INVENTORY, GameStates.CHARACTER_SCREEN):
@@ -317,10 +322,10 @@ def main():
 	
 	libtcod.console_set_custom_font('arial12x12.png', libtcod.FONT_TYPE_GREYSCALE | libtcod.FONT_LAYOUT_TCOD)
 	
-	libtcod.console_init_root(constants['screen_width'], constants['screen_height'], constants['window_title'], False)
+	libtcod.console_init_root(constants['screen_width'], constants['screen_height'], constants['window_title'], False, libtcod.RENDERER_SDL2)
 	
-	con = libtcod.console_new(constants['screen_width'], constants['screen_height'])
-	panel = libtcod.console_new(constants['screen_width'], constants['panel_height'])
+	con = libtcod.console.Console(constants['screen_width'], constants['screen_height'])
+	panel = libtcod.console.Console(constants['screen_width'], constants['panel_height'])
 	
 	player = None
 	entities = []
@@ -370,7 +375,7 @@ def main():
 				break
 
 		else:
-			libtcod.console_clear(con)
+			con.clear()
 			play_game(player, entities, game_map, message_log, game_state, con, panel, constants)
 
 			show_main_menu = True

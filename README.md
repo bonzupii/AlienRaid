@@ -1,7 +1,7 @@
-# AlienRaid
+### AlienRaid
 A roguelike RPG coded with python3/libtcod. You are Wrpgnyth, an alien from the Planet Zoltron who has crash landed on earth in the Australian Outback. The wildlife is trying to kill you. The object of the game is to dive as deep as possible. Good luck! 
 
-To run the game in linux, open a terminal and cd into the game directory, then run:
+### To run the game in linux, open a terminal and cd into the game directory, then run:
 
 run "pip3 install tcod" to install libtcod
 
@@ -16,7 +16,7 @@ python3 launcher.py
 
 
 
-To run the game in windows:
+### To run the game in windows:
 
 Make sure you have python 3.5+ installed.
 
@@ -28,7 +28,7 @@ Run "python launcher.py" to excecute the game
 
 This game has worked on windows but it is not officially supported by the game developer. If you have problems running it in windows, holler at me on Freenode in #roguelikedev. The name is Bonzu. We'll try and see if we can get it working for you, but no promises.
 
-Movement keys are (Ideally viewed in raw text format, github makes this look really wonky):
+### Movement keys are (Ideally viewed in raw text format, github makes this look really wonky):
  
  y   k   u
  
@@ -44,13 +44,15 @@ Movement keys are (Ideally viewed in raw text format, github makes this look rea
 You may also use the arrow keys for horizontal and vertical movement.
  
 
-Command keys are:
+### Command keys are:
 
 i - Open inventory.
 
 d - Drop inventory.
 
 z - Rest/Snooze. You will regain a small percentage of your maximum hp. Don't over-use this or the Dropbear will get you!
+
+s - Save game.
 
 g - Grab/Pickup items.
 
