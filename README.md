@@ -1,7 +1,7 @@
 ### AlienRaid
 A roguelike RPG coded with python3/libtcod. You are Wrpgnyth, an alien from the Planet Zoltron who has crash landed on earth in the Australian Outback. The wildlife is trying to kill you. The object of the game is to dive as deep as possible. Good luck! 
 
-### To run the game in linux, open a terminal and cd into the game directory, then run:
+### To run the game in linux, open a terminal and cd into the game directory:
 
 Make sure you have python3-pip, libsdl2-dev and libpython3-dev and all dependencies for these packages installed.
 
