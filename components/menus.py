@@ -38,10 +38,20 @@ def inventory_menu(con, header, player, inventory_width, screen_width, screen_he
 		options = []
 		
 		for item in player.inventory.items:
-			if player.equipment.main_hand == item:
-				options.append('{0} (on right tentacle)'.format(item.name))
-			elif player.equipment.off_hand == item:
-				options.append('{0} (on left tentacle)'.format(item.name))
+			if player.equipment.top_right_tentacle == item:
+				options.append('{0} (on top right tentacle)'.format(item.name))
+			elif player.equipment.top_left_tentacle == item:
+				options.append('{0} (on top left tentacle)'.format(item.name))
+			elif player.equipment.bottom_right_tentacle == item:
+				options.append('{0} (on bottom right tentacle)'.format(item.name))
+			elif player.equipment.bottom_left_tentacle == item:
+				options.append('{0} (on bottom left tentacle)'.format(item.name))
+			elif player.equipment.chest_plate == item:
+				options.append('{0} (on chest)'.format(item.name))
+			elif player.equipment.helmet == item:
+				options.append('{0} (on head)'.format(item.name))
+			elif player.equipment.neck == item:
+				options.append('{0} (on neck)'.format(item.name))
 			else:
 				options.append(item.name)
 		

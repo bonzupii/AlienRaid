@@ -82,12 +82,12 @@ def get_game_variables(constants):
 	player = Entity(0, 0, 197, libtcod.green, 'Wrpgnyth', blocks=True, render_order=RenderOrder.ACTOR, fighter=fighter_component, inventory=inventory_component, level=level_component, equipment=equipment_component)
 	entities = [player]
 	
-	equippable_component = Equippable(EquipmentSlots.MAIN_HAND, power_bonus=20)
+	equippable_component = Equippable(EquipmentSlots.TENTACLE, power_bonus=20)
 	tentaclaws = Entity(0, 0, 218, libtcod.red, 'Tentaclaws', equippable=equippable_component)
 	player.inventory.add_item(tentaclaws)
 	player.equipment.toggle_equip(tentaclaws)
 	
-	equippable_component = Equippable(EquipmentSlots.OFF_HAND, power_bonus=20, defense_bonus=20)
+	equippable_component = Equippable(EquipmentSlots.TENTACLE, power_bonus=20, defense_bonus=20)
 	aluminitetentasleeve = Entity(0, 0, 192, libtcod.silver, 'Aluminite Tentasleeve', equippable=equippable_component)
 	player.inventory.add_item(aluminitetentasleeve)
 	player.equipment.toggle_equip(aluminitetentasleeve)

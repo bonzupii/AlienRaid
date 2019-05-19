@@ -12,7 +12,7 @@ from components.entity import Entity
 from components.game_messages import Message
 from components.game_states import GameStates
 
-from functions.item_functions import use_stun_grenade, use_plasma_grenade, use_shock_charge, heal, morphine_pack ,use_ray_gun
+from functions.item_functions import use_stun_grenade, use_plasma_grenade, use_shock_charge, heal, morphine_pack, use_ray_gun
 from functions.render_functions import RenderOrder
 
 from map_objects.rectangle import Rect
@@ -217,10 +217,10 @@ class GameMap:
 					item_component = Item(use_function=morphine_pack, amount=500)
 					item = Entity(x, y, 195, libtcod.Color(255, 30, 0), 'Med Kit', render_order=RenderOrder.ITEM, item=item_component)
 				elif item_choice == 'tentacruels':
-					equippable_component = Equippable(EquipmentSlots.MAIN_HAND, power_bonus=40)
+					equippable_component = Equippable(EquipmentSlots.TENTACLE, power_bonus=40)
 					item = Entity(x, y, 218, libtcod.purple, 'Tentacruel', equippable=equippable_component)
 				elif item_choice == 'energy_shield':
-					equippable_component = Equippable(EquipmentSlots.OFF_HAND, defense_bonus=50, max_hp_bonus=250)
+					equippable_component = Equippable(EquipmentSlots.TENTACLE, defense_bonus=50, max_hp_bonus=250)
 					item = Entity(x, y, 217, libtcod.cyan, 'Energy Shield', equippable=equippable_component)
 				elif item_choice == 'plasma_grenade':
 					item_component = Item(use_function=use_plasma_grenade, targeting=True, targeting_message=Message('Left-click an enemy to lob the Plasma Grenade at it, or right-click to cancel.', libtcod.light_cyan), damage=250, radius=3)
