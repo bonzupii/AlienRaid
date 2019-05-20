@@ -1,4 +1,24 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+#  initialize_new_game.py
+#  
+#  Copyright 2019 Bonzu <bonzupii@protonmail.com>
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 3 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#  
+#  
 import tcod as libtcod
 
 from components.equipment import Equipment
@@ -45,8 +65,8 @@ def get_constants():
 	fov_radius = 12
 	
 	colors = {
-		'dark_wall': libtcod.Color(0, 0, 60),
-		'dark_ground': libtcod.Color(50, 50, 110),
+		'dark_wall': libtcod.Color(100, 20, 10),
+		'dark_ground': libtcod.Color(170, 90, 10),
 		'light_wall': libtcod.Color(140, 60, 10),
 		'light_ground': libtcod.Color(210, 130, 50)
 	}
@@ -79,7 +99,7 @@ def get_game_variables(constants):
 	inventory_component = Inventory(26)
 	level_component = Level()
 	equipment_component = Equipment()
-	player = Entity(0, 0, 197, libtcod.green, 'Wrpgnyth', blocks=True, render_order=RenderOrder.ACTOR, fighter=fighter_component, inventory=inventory_component, level=level_component, equipment=equipment_component)
+	player = Entity(0, 0, 197, libtcod.Color(15, 77, 0), 'Wrpgnyth', blocks=True, render_order=RenderOrder.ACTOR, fighter=fighter_component, inventory=inventory_component, level=level_component, equipment=equipment_component)
 	entities = [player]
 	
 	equippable_component = Equippable(EquipmentSlots.TENTACLE, power_bonus=20)

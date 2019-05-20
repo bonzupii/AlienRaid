@@ -1,4 +1,24 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+#  menus.py
+#  
+#  Copyright 2019 Bonzu <bonzupii@protonmail.com>
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 3 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#  
+# 
 import tcod as libtcod
 
 
@@ -62,7 +82,7 @@ def main_menu(con, background_image, screen_width, screen_height):
 	
 	libtcod.console_set_default_foreground(0, libtcod.light_green)
 	libtcod.console_print_ex(0, int(screen_width / 2), int(screen_height / 2) - 4, libtcod.BKGND_NONE, libtcod.CENTER, 'ALIEN RAID')
-	libtcod.console_print_ex(0, int(screen_width / 2), int(screen_height - 2), libtcod.BKGND_NONE, libtcod.CENTER, 'By Bonzu Pippinpaddlopsikopolis III')
+	libtcod.console_print_ex(0, int(screen_width / 2), int(screen_height - 2), libtcod.BKGND_NONE, libtcod.CENTER, '(C) 2019 By Bonzu Pippinpaddlopsikopolis III <bonzupii@protonmail.com>')
 	libtcod.console_print_ex(0, int(screen_width / 2), int(screen_height - 4), libtcod.BKGND_NONE, libtcod.CENTER, 'Please see the README.md file to learn about game controls.')
 	menu(con, '', ['Play a new game', 'Continue last game', 'Quit'], 24,  screen_width, screen_height)
 	

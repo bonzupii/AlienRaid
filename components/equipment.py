@@ -1,3 +1,23 @@
+# -*- coding: utf-8 -*-
+#
+#  equipment.py
+#  
+#  Copyright 2019 Bonzu <bonzupii@protonmail.com>
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 3 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#  
+#  
 from components.equipment_slots import EquipmentSlots
 
 
@@ -98,38 +118,7 @@ class Equipment:
 
 		slot = equippable_entity.equippable.slot
 
-		if slot == EquipmentSlots.TENTACLE:
-			if self.top_right_tentacle == equippable_entity:
-				self.top_right_tentacle = None
-				results.append({'dequipped': equippable_entity})
-			elif self.top_left_tentacle == equippable_entity:
-				self.top_left_tentacle = None
-				results.append({'dequipped': equippable_entity})
-			elif self.bottom_right_tentacle == equippable_entity:
-				self.bottom_right_tentacle = None
-				results.append({'dequipped': equippable_entity})
-			elif self.bottom_left_tentacle == equippable_entity:
-				self.bottom_left_tentacle = None
-				results.append({'dequipped': equippable_entity})
-			else:
-				if self.top_right_tentacle == None:
-					self.top_right_tentacle = equippable_entity
-					results.append({'equipped': equippable_entity})
-				elif self.top_left_tentacle == None:
-					self.top_left_tentacle= equippable_entity
-					results.append({'equipped': equippable_entity})
-				elif self.bottom_right_tentacle == None:
-					self.bottom_right_tentacle= equippable_entity
-					results.append({'equipped': equippable_entity})
-				elif self.bottom_left_tentacle == None:
-					self.bottom_left_tentacle= equippable_entity
-					results.append({'equipped': equippable_entity})
-				else:
-					results.append({'dequipped': self.top_right_tentacle})
-					self.top_right_tentacle = equippable_entity
-					results.append({'equipped': self.top_right_tentacle})
-
-		elif slot == EquipmentSlots.CHEST_PLATE:
+		if slot == EquipmentSlots.CHEST_PLATE:
 			if self.chest_plate == equippable_entity:
 				self.chest_plate = None
 				results.append({'dequipped': equippable_entity})
@@ -160,6 +149,37 @@ class Equipment:
 					results.append({'dequipped': self.bottom_left_tentacle})
 
 				self.neck = equippable_entity
-				results.neck({'equipped': equippable_entity})
+				results.append({'equipped': equippable_entity})
+
+		elif slot == EquipmentSlots.TENTACLE:
+			if self.top_right_tentacle == equippable_entity:
+				self.top_right_tentacle = None
+				results.append({'dequipped': equippable_entity})
+			elif self.top_left_tentacle == equippable_entity:
+				self.top_left_tentacle = None
+				results.append({'dequipped': equippable_entity})
+			elif self.bottom_right_tentacle == equippable_entity:
+				self.bottom_right_tentacle = None
+				results.append({'dequipped': equippable_entity})
+			elif self.bottom_left_tentacle == equippable_entity:
+				self.bottom_left_tentacle = None
+				results.append({'dequipped': equippable_entity})
+			else:
+				if self.top_right_tentacle == None:
+					self.top_right_tentacle = equippable_entity
+					results.append({'equipped': equippable_entity})
+				elif self.top_left_tentacle == None:
+					self.top_left_tentacle= equippable_entity
+					results.append({'equipped': equippable_entity})
+				elif self.bottom_right_tentacle == None:
+					self.bottom_right_tentacle= equippable_entity
+					results.append({'equipped': equippable_entity})
+				elif self.bottom_left_tentacle == None:
+					self.bottom_left_tentacle= equippable_entity
+					results.append({'equipped': equippable_entity})
+				else:
+					results.append({'dequipped': self.top_right_tentacle})
+					self.top_right_tentacle = equippable_entity
+					results.append({'equipped': self.top_right_tentacle})
 
 		return results

@@ -1,9 +1,30 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+#  render_functions.py
+#  
+#  Copyright 2019 Bonzu <bonzupii@protonmail.com>
+#  
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 3 of the License, or
+#  (at your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#  
+#  
 import tcod as libtcod
 
 from enum import Enum
 from components.game_states import GameStates
 from components.menus import character_screen, inventory_menu, level_up_menu
+from random import randint
 
 
 class RenderOrder(Enum):
@@ -33,8 +54,6 @@ def render_bar(panel, x, y, total_width, name, value, maximum, bar_color, back_c
 		libtcod.console_rect(panel, x, y, bar_width, 1, False, libtcod.BKGND_SCREEN)
 		
 	libtcod.console_set_default_foreground(panel, libtcod.white)
-#	libtcod.console_print_ex(panel, int(x + total_width / 2), y, libtcod.BKGND_NONE, libtcod.CENTER,
-#							 '{0}: {1}/{2}'.format(name, value, maximum))
 	libtcod.console_print_ex(panel, int((x + total_width / 2) - 8), y, libtcod.BKGND_NONE, libtcod.LEFT,
 							 '{0}: {1}/{2}'.format(name, value, maximum))
 
@@ -48,7 +67,7 @@ def render_all(con, panel, entities, player, game_map, fov_map, fov_recompute, m
 			
 				if visible:
 					if wall:
-						libtcod.console_set_char_background(con, x, y, colors.get('light_wall'), libtcod.BKGND_SET)
+						libtcod.console_put_char_ex(con, x, y, randint(176, 177), libtcod.dark_green, colors.get('light_wall'))
 					else:
 						libtcod.console_set_char_background(con, x, y, colors.get('light_ground'), libtcod.BKGND_SET)
 					
@@ -56,7 +75,7 @@ def render_all(con, panel, entities, player, game_map, fov_map, fov_recompute, m
 					
 				elif game_map.tiles[x][y].explored:
 					if wall:
-						libtcod.console_set_char_background(con, x, y, colors.get('dark_wall'), libtcod.BKGND_SET)
+						libtcod.console_put_char_ex(con, x, y, randint(176,177), libtcod.darker_green, colors.get('dark_wall'))
 					else:
 						libtcod.console_set_char_background(con, x, y, colors.get('dark_ground'), libtcod.BKGND_SET)
 				
