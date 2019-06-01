@@ -38,8 +38,6 @@ Run "py -m pip install tcod" to install libtcod
 
 Run "python launcher.py" to excecute the game
 
-This game has worked on windows but it is not officially supported by the game developer. If you have problems running it in windows, holler at me on Freenode in #roguelikedev. The name is Bonzu. We'll try and see if we can get it working for you, but no promises.
-
 ### Movement keys are (Ideally viewed in raw text format, github makes this look really wonky):
  
  y   k   u
