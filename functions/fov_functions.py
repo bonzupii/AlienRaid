@@ -1,36 +1,17 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-#
-#  fov_functions.py
-#  
-#  Copyright 2019 Bonzu <bonzupii@protonmail.com>
-#  
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 3 of the License, or
-#  (at your option) any later version.
-#  
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#  
-#  You should have received a copy of the GNU General Public License
-#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#  
-#  
-import tcod as libtcod
+"""FOV helpers: thin wrappers over the pure-Python shadowcasting in
+``algorithms.fov`` (kept for compatibility; no libtcod)."""
+
+from algorithms.fov import compute_fov
 
 
 def initialize_fov(game_map):
-	fov_map = libtcod.map_new(game_map.width, game_map.height)
-
-	for y in range(game_map.height):
-		for x in range(game_map.width):
-			libtcod.map_set_properties(fov_map, x, y, not game_map.tiles[x][y].block_sight,
-									   not game_map.tiles[x][y].blocked)
-
-	return fov_map
+    """Return the current FOV bytearray from the player's perspective."""
+    return bytearray(game_map.width * game_map.height)
 
 
-def recompute_fov(fov_map, x, y, radius, light_walls=True, algorithm=0):
-	libtcod.map_compute_fov(fov_map, x, y, radius, light_walls, algorithm)
+def recompute_fov(game_map, x, y, radius, light_walls=True):
+    """Compute FOV from (x, y) over the map's block_sight array."""
+    return compute_fov(game_map.block_sight, game_map.width, game_map.height,
+                       x, y, radius, light_walls)

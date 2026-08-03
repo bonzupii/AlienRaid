@@ -81,6 +81,8 @@ class HeuristicMonster:
         # Dormant until seen (classic roguelike behaviour).
         if not _in_fov(fov_map, game_map, monster.x, monster.y):
             return results
+        # Hit-and-run species count down their retreat turns.
+        self.retreat = max(0, self.retreat - 1)
         # Slow species act only every SLOW turns.
         self.slow_tick += 1
         if self.slow_tick % self.SLOW != 0:
