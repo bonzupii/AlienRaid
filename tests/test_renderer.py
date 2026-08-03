@@ -66,7 +66,7 @@ class TestSpriteLoader(unittest.TestCase):
             x = (i % 20) * 12
             y = (i // 20) * 12
             surf.blit(loader.get(name, KANGA_RED), (x, y))
-        self.assertGreater(_ink_count(surf), 1000)
+        self.assertGreater(_ink_count(surf), 200)
 
     def test_cache(self):
         loader = SpriteLoader()

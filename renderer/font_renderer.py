@@ -46,6 +46,10 @@ class FontRenderer:
         if not os.path.isfile(font_path):
             raise FileNotFoundError('Bitmap font not found: {0}'.format(font_path))
 
+        if pygame.display.get_surface() is None:
+            # A display must exist for convert_alpha(); headless runs get a
+            # 1x1 dummy window (SDL_VIDEODRIVER=dummy).
+            pygame.display.set_mode((1, 1))
         atlas = pygame.image.load(font_path).convert_alpha()
         atlas_w, atlas_h = atlas.get_size()
         self.cols = atlas_w // tile
