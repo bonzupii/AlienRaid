@@ -362,6 +362,12 @@ def _icon_star(s, c):
     _circle(s, shade(c, 1.5), (6, 5), 1)
 
 
+def _icon_tube(s, c):
+    _poly(s, c, [(3, 2), (5, 2), (8, 11), (6, 11)])   # didgeridoo body
+    _circle(s, shade(c, 1.4), (4, 2), 1)               # mouthpiece
+    _circle(s, shade(c, 0.7), (7, 11), 1)
+
+
 def _sprite_unknown(s, c):
     pygame.draw.rect(s, (255, 0, 255), pygame.Rect(0, 0, TILE, TILE))
 
@@ -405,6 +411,7 @@ RECIPES = {
     'icon_ration': _icon_ration,
     'icon_tea': _icon_tea,
     'icon_star': _icon_star,
+    'icon_tube': _icon_tube,
 }
 
 
