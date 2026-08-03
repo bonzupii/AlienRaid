@@ -253,7 +253,7 @@ class KangaAI(HeuristicMonster):
             damage = self.owner.fighter.power + bonus - target.fighter.defense
             if damage > 0:
                 results.append({'message': Message('The Kanga kicks {0} for {1} hit points!'.format(target.name, damage), C.WHITE)})
-                results.extend(target.fighter.take_damage(damage))
+                results.extend(target.fighter.take_damage(damage, attacker=self.owner))
             self.charge = 0
         else:
             results.extend(self.owner.fighter.attack(target))
@@ -276,7 +276,7 @@ class WallarooAI(KangaAI):
             damage = self.owner.fighter.power + bonus - target.fighter.defense
             if damage > 0:
                 results.append({'message': Message('The Wallaroo body-checks {0} for {1} hit points!'.format(target.name, damage), C.WHITE)})
-                results.extend(target.fighter.take_damage(damage))
+                results.extend(target.fighter.take_damage(damage, attacker=self.owner))
             self.charge = 0
         else:
             results.extend(self.owner.fighter.attack(target))
@@ -401,7 +401,7 @@ class DropbearAI(HeuristicMonster):
                 damage = self.owner.fighter.power + int(self.owner.fighter.power * 0.4) - target.fighter.defense
                 if damage > 0:
                     results.append({'message': Message('The Dropbear rakes {0} for {1} hit points!'.format(target.name, damage), C.WHITE)})
-                    results.extend(target.fighter.take_damage(damage))
+                    results.extend(target.fighter.take_damage(damage, attacker=self.owner))
                 self._after_attack()
         return results
 
@@ -426,7 +426,7 @@ class TaipanAI(HeuristicMonster):
             results.append({'message': Message('The Taipan spits a stream of venom!', C.GREEN)})
             if damage > 0:
                 results.append({'message': Message('The venom burns {0} for {1} hit points!'.format(target.name, damage), C.WHITE)})
-                results.extend(target.fighter.take_damage(damage))
+                results.extend(target.fighter.take_damage(damage, attacker=self.owner))
         return results
 
 
@@ -499,7 +499,7 @@ class CassowaryAI(HeuristicMonster):
             results.append({'message': Message('The Cassowary lashes out with its dagger claw!', C.LIGHT_ORANGE)})
             if damage > 0:
                 results.append({'message': Message('The Cassowary rips {0} for {1} hit points!'.format(target.name, damage), C.WHITE)})
-                results.extend(target.fighter.take_damage(damage))
+                results.extend(target.fighter.take_damage(damage, attacker=self.owner))
             else:
                 results.append({'message': Message('The Cassowary strikes but does no damage.', C.WHITE)})
         else:
@@ -515,6 +515,41 @@ class CrocodileAI(HeuristicMonster):
     FLEE_HP = 0.0
     ENGAGE = 1
     FAST = 0  # acts every other turn
+
+
+class EchidnaAI(HeuristicMonster):
+    """Living tank: plods forward every other turn and never flees; its
+    quills prick anyone foolish enough to hit it."""
+    AGGRESSION = 0.6
+    CAUTION = 0.0
+    FLEE_HP = 0.0
+    ENGAGE = 1
+    FAST = 0  # acts every other turn
+
+
+class FunnelWebAI(HeuristicMonster):
+    """Fast venomous ambusher: closes quickly and fang-bites with venom."""
+    AGGRESSION = 1.2
+    CAUTION = 0.2
+    FLEE_HP = 0.2
+    ENGAGE = 1
+    ERRATIC = 0.6
+
+    def _attack(self, target):
+        results = []
+        if randint(0, 100) < 40:
+            damage = int(self.owner.fighter.power * 1.3) - target.fighter.defense
+            results.append({'message': Message(
+                'The Funnel-web Spider sinks its fangs into {0}!'.format(target.name), C.GREEN)})
+            if damage > 0:
+                results.append({'message': Message(
+                    'The venom burns {0} for {1} hit points!'.format(target.name, damage), C.WHITE)})
+                results.extend(target.fighter.take_damage(damage, attacker=self.owner))
+            else:
+                results.append({'message': Message('The bite leaves no mark.', C.WHITE)})
+        else:
+            results.extend(self.owner.fighter.attack(target))
+        return results
 
 
 class StunnedMonster:

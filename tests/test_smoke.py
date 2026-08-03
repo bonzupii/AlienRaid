@@ -22,6 +22,7 @@ import pygame
 pygame.init()
 
 from algorithms.fov import compute_fov
+from components import menus
 from components.entity import Entity, get_blocking_entities_at_location
 from components.fighter import Fighter
 from components.game_messages import MessageLog
@@ -89,6 +90,27 @@ def _frame_sig(surf, step=12, max_y=None):
 
 
 class TestBoot(unittest.TestCase):
+    def test_main_menu_renders(self):
+        """Regression guard: the main menu must render with the real
+        menu_background.png. A paletted (8-bit) background used to crash
+        smoothscale with 'Only 24-bit or 32-bit surfaces can be smoothly
+        scaled'."""
+        constants, player, entities, game_map, message_log, game_state = fresh_game()
+        renderer = Renderer(constants)
+        if not os.path.isfile('menu_background.png'):
+            self.skipTest('menu_background.png missing')
+        bg = pygame.image.load('menu_background.png')
+        self.assertGreaterEqual(
+            bg.get_bitsize(), 24,
+            'menu background must be a 24/32-bit surface (paletted 8-bit crashes smoothscale)')
+        menus.main_menu(renderer.frame, renderer.font, bg,
+                        constants['screen_width'], constants['screen_height'])
+        renderer.present()
+        pygame.display.flip()
+        w, h = renderer.frame.get_size()
+        self.assertGreater(_region_ink(renderer.frame, (0, 0, w, h), step=6), 100,
+                           'main menu rendered nothing')
+
     def test_render_every_state(self):
         constants, player, entities, game_map, message_log, game_state = fresh_game()
         renderer = Renderer(constants)
@@ -256,6 +278,20 @@ class TestBoot(unittest.TestCase):
         self.assertFalse(monster.blocks)
         self.assertIsNone(monster.fighter)
         self.assertEqual(monster.sprite_id, 'corpse')
+
+    def test_echidna_thorns(self):
+        """Hitting an echidna pricks the attacker (quill counter-damage)."""
+        constants, player, entities, game_map, message_log, game_state = fresh_game()
+        echidna = create_monster('echidna', 6, player.x + 1, player.y)
+        entities.append(echidna)
+        thorns = echidna.fighter.thorns
+        self.assertGreater(thorns, 0, 'echidna should have quill thorns')
+        player.fighter.base_power = 500  # guaranteed to hurt it, immune to starter-gear changes
+        hp_before = player.fighter.hp
+        player.fighter.attack(echidna)
+        self.assertLess(player.fighter.hp, hp_before,
+                        'echidna quills did not prick the attacker')
+        self.assertEqual(player.fighter.hp, hp_before - thorns)
 
     def test_floor_transitions_and_ship(self):
         constants, player, entities, game_map, message_log, game_state = fresh_game()

@@ -26,6 +26,18 @@ PRESERVED = "0123456789!@#$%^&*()_+=-abcdefghijklmnopqrstuvwxyz" \
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ<>?;:,.[]/'`~{}"
 
 
+class TestAssets(unittest.TestCase):
+    def test_no_iccp_chunks(self):
+        # libpng warns 'iCCP: CRC error' on the game's PNG assets; the
+        # corrupt embedded colour-profile chunk must stay stripped.
+        for path in ('alienraid12x12.png', 'menu_background.png'):
+            if not os.path.isfile(path):
+                continue
+            with open(path, 'rb') as f:
+                data = f.read()
+            self.assertNotIn(b'iCCP', data, 'corrupt iCCP chunk still in ' + path)
+
+
 class TestSdlImage(unittest.TestCase):
     def test_sdl_image_available(self):
         # Regression guard. Without SDL_image, pygame.image.load only

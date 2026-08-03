@@ -6,7 +6,8 @@ from random import randint
 
 from components.ai import (KangaAI, JoeyAI, WallabyAI, WallarooAI, TreeKangaAI,
                            DingoAI, GoannaAI, KillerBeeAI, DropbearAI, TaipanAI,
-                           EmuAI, WombatAI, MagpieAI, CassowaryAI, CrocodileAI)
+                           EmuAI, WombatAI, MagpieAI, CassowaryAI, CrocodileAI,
+                           EchidnaAI, FunnelWebAI)
 from components.entity import Entity
 from components.fighter import Fighter
 from functions.render_order import RenderOrder
@@ -23,8 +24,10 @@ MONSTER_TABLES = {
     'goanna':      [[0, 5], [30, 8], [45, 11], [40, 14], [25, 18]],
     'killer_bee':  [[5, 1], [40, 7], [70, 10], [40, 12], [15, 15]],
     'dropbear':    [[0, 8], [20, 10], [40, 12], [50, 15], [60, 18]],
+    'echidna':     [[0, 6], [20, 9], [30, 12], [30, 16], [20, 20]],
     'taipan':      [[0, 6], [25, 9], [40, 12], [35, 15], [20, 19]],
     'emu':         [[0, 3], [25, 6], [35, 9], [30, 13], [20, 17]],
+    'funnel_web':  [[0, 5], [20, 8], [35, 11], [30, 14], [20, 18]],
     'wombat':      [[0, 4], [20, 7], [30, 10], [30, 14], [25, 18]],
     'magpie':      [[0, 5], [25, 8], [35, 11], [25, 15]],
     'cassowary':   [[0, 11], [15, 14], [25, 17], [30, 19]],
@@ -42,6 +45,8 @@ TEMPLATES = {
     'goanna':      {'hp': 14, 'power': 3.0, 'def': 1.1, 'xp': 3.2, 'min': 20, 'max': 32, 'color': C.GOANNA_GREEN},
     'killer_bee':  {'hp': 7,  'power': 9.0, 'def': 1.0, 'xp': 2.2, 'min': 8,  'max': 12, 'color': C.YELLOW},
     'dropbear':    {'hp': 10, 'power': 3.6, 'def': 1.3, 'xp': 4.0, 'min': 30, 'max': 40, 'color': C.DROPBEAR_GREY},
+    'echidna':     {'hp': 16, 'power': 1.8, 'def': 3.0, 'xp': 3.6, 'thorns': 0.5, 'min': 18, 'max': 30, 'color': (120, 90, 60)},
+    'funnel_web':  {'hp': 9,  'power': 6.0, 'def': 0.9, 'xp': 3.0, 'min': 10, 'max': 18, 'color': (40, 30, 30)},
     'taipan':      {'hp': 12, 'power': 3.4, 'def': 1.0, 'xp': 3.6, 'min': 16, 'max': 26, 'color': (139, 125, 60)},
     'emu':         {'hp': 13, 'power': 2.6, 'def': 1.0, 'xp': 3.0, 'min': 16, 'max': 26, 'color': (110, 90, 60)},
     'wombat':      {'hp': 18, 'power': 2.4, 'def': 2.0, 'xp': 3.4, 'min': 20, 'max': 32, 'color': (90, 90, 90)},
@@ -53,17 +58,17 @@ TEMPLATES = {
 AI_CLASSES = {
     'kanga': KangaAI, 'joey': JoeyAI, 'wallaby': WallabyAI,
     'wallaroo': WallarooAI, 'tree_kanga': TreeKangaAI, 'dingo': DingoAI,
-    'goanna': GoannaAI, 'killer_bee': KillerBeeAI, 'dropbear': DropbearAI,
-    'taipan': TaipanAI, 'emu': EmuAI, 'wombat': WombatAI, 'magpie': MagpieAI,
-    'cassowary': CassowaryAI, 'crocodile': CrocodileAI,
+    'goanna': GoannaAI, 'killer_bee': KillerBeeAI,    'dropbear': DropbearAI, 'echidna': EchidnaAI, 'taipan': TaipanAI,
+    'emu': EmuAI, 'funnel_web': FunnelWebAI, 'wombat': WombatAI,
+    'magpie': MagpieAI, 'cassowary': CassowaryAI, 'crocodile': CrocodileAI,
 }
 
 DISPLAY_NAMES = {
     'kanga': 'Kanga', 'joey': 'Joey', 'wallaby': 'Wallaby',
     'wallaroo': 'Wallaroo', 'tree_kanga': 'Tree Kanga', 'dingo': 'Dingo',
-    'goanna': 'Goanna', 'killer_bee': 'Killer Bee', 'dropbear': 'Dropbear',
-    'taipan': 'Taipan', 'emu': 'Emu', 'wombat': 'Wombat', 'magpie': 'Magpie',
-    'cassowary': 'Cassowary', 'crocodile': 'Crocodile',
+    'goanna': 'Goanna', 'killer_bee': 'Killer Bee',    'dropbear': 'Dropbear', 'echidna': 'Echidna', 'taipan': 'Taipan',
+    'emu': 'Emu', 'funnel_web': 'Funnel-web Spider', 'wombat': 'Wombat',
+    'magpie': 'Magpie', 'cassowary': 'Cassowary', 'crocodile': 'Crocodile',
 }
 
 
@@ -75,8 +80,9 @@ def create_monster(choice, dungeon_level, x, y):
     power = int(statbase * t['power'])
     defense = int(statbase * t['def']) + dungeon_level
     xp = int(statbase * t['xp'])
+    thorns = int(statbase * t.get('thorns', 0))
 
-    fighter = Fighter(hp=hp, defense=defense, power=power, xp=xp)
+    fighter = Fighter(hp=hp, defense=defense, power=power, xp=xp, thorns=thorns)
     ai = AI_CLASSES[choice]()
     monster = Entity(x, y, choice, t['color'], DISPLAY_NAMES[choice],
                      blocks=True, render_order=RenderOrder.ACTOR,

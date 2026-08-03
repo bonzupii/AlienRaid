@@ -67,9 +67,10 @@ four, return to the surface and use the ship to escape!
 
 ### The wildlife
 
-Fifteen species, each with its own behaviour: territorial **Kangas** (they wind
-up mighty kicks), timid **Joeys**, skittish **Wallabies**, bruiser **Wallaroos**,
-ambushing **Tree Kangas**, pack-hunting **Dingoes**, cover-darting **Goannas**,
-hit-and-run **Killer Bees**, pouncing **Dropbears**, venom-spitting **Taipans**,
-fast **Emus**, unshakeable **Wombats**, swooping **Magpies**, lethal **Cassowaries**
-and ambush **Crocodiles**.
+Seventeen species, each with its own behaviour: territorial **Kangas** (they
+wind up mighty kicks), timid **Joeys**, skittish **Wallabies**, bruiser
+**Wallaroos**, ambushing **Tree Kangas**, pack-hunting **Dingoes**, cover-darting
+**Goannas**, hit-and-run **Killer Bees**, pouncing **Dropbears**, quilled
+**Echidnas** (they prick anyone who hits them), venom-spitting **Taipans**,
+fast **Emus**, venomous **Funnel-web Spiders**, unshakeable **Wombats**, swooping
+**Magpies**, lethal **Cassowaries** and ambush **Crocodiles**.
