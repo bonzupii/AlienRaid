@@ -1,0 +1,11 @@
+[project]
+name = "alienraid"
+version = "0.1.0"
+description = "A roguelike RPG. You are Wrpgnyth, an alien crash-landed in the Australian Outback."
+requires-python = ">=3.11"
+dependencies = [
+    "pygame",
+]
+
+[tool.uv]
+package = false
