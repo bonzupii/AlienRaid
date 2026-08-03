@@ -47,6 +47,19 @@ class TestBoot(unittest.TestCase):
                       GameStates.PLAYER_DEAD):
             renderer.render(game_map, fov, entities, player, message_log, state, (10, 10))
             pygame.display.flip()
+        # Resize the window (as a tiling WM would) and re-render.
+        renderer.resize(900, 700)
+        renderer.render(game_map, fov, entities, player, message_log,
+                        GameStates.PLAYERS_TURN, (10, 10))
+        pygame.display.flip()
+        tile = renderer.screen_to_tile((450, 350))
+        self.assertIsNotNone(tile)
+        self.assertGreaterEqual(tile[0], 0)
+        renderer.resize(renderer.screen_w, renderer.screen_h)
+        renderer.render(game_map, fov, entities, player, message_log,
+                        GameStates.PLAYERS_TURN, (10, 10))
+        pygame.display.flip()
+
         pygame.image.save(renderer.screen, '/tmp/alienraid_frame.png')
         # The screen should not be entirely black.
         w, h = renderer.screen.get_size()

@@ -107,15 +107,16 @@ def handle_victory_keys(event):
     return {}
 
 
-def handle_mouse(event):
+def handle_mouse(event, tile):
+    """Mouse button down -> action dict. ``tile`` is the already-mapped
+    map tile under the cursor (computed by the renderer, which knows the
+    window scaling)."""
     if event.type != pygame.MOUSEBUTTONDOWN:
         return {}
-    x = event.pos[0] // TILE
-    y = event.pos[1] // TILE
     if event.button == 1:
-        return {'left_click': (x, y)}
+        return {'left_click': tile}
     elif event.button == 3:
-        return {'right_click': (x, y)}
+        return {'right_click': tile}
     return {}
 
 

@@ -18,18 +18,18 @@ the Dropbear is always listening.
 
 ![alt text](https://raw.githubusercontent.com/bonzupii/AlienRaid/master/screenshot2.png "Gameplay")
 
-### Running the game (Nix)
+### Running the game
 
-The game runs inside a hermetic nix dev shell — nothing is installed globally.
+Open a terminal in the game directory and run:
 
 ```sh
-nix develop          # resolves nixpkgs 26.05 and runs `uv sync` into .venv
+nix develop
 .venv/bin/python launcher.py
 ```
 
-All dependencies (pygame, SDL2, SDL2_image, SDL2_ttf, libGL) are provided by
-the flake; `uv` resolves everything into a project-local `.venv`. There are no
-version pins in `pyproject.toml` — `uv.lock` pins the resolved set.
+The first `nix develop` takes a little while to set everything up. The window is
+resizable — the view scales to fit while keeping the game's aspect ratio, so it
+plays fine no matter how your window manager sizes it.
 
 ### Movement keys
 
@@ -68,17 +68,4 @@ up mighty kicks), timid **Joeys**, skittish **Wallabies**, bruiser **Wallaroos**
 ambushing **Tree Kangas**, pack-hunting **Dingoes**, cover-darting **Goannas**,
 hit-and-run **Killer Bees**, pouncing **Dropbears**, venom-spitting **Taipans**,
 fast **Emus**, unshakeable **Wombats**, swooping **Magpies**, lethal **Cassowaries**
-and ambush **Crocodiles**. The AI uses lightweight Turochamp-style heuristics —
-every species scores its options each turn with a tuned evaluation function
-rather than searching deep.
-
-### Developing
-
-Run the test suite inside the dev shell:
-
-```sh
-nix develop -c .venv/bin/python -m unittest discover -s tests
-```
-
-`tests/render_sprite_sheet.py` renders every procedural sprite (and the
-preserved font charset) into labeled PNG sheets for visual review.
+and ambush **Crocodiles**.

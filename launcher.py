@@ -28,8 +28,6 @@ from renderer.renderer import Renderer
 from renderer import palette as C
 from functions.systems import passive_regen, wait_action, process_player_turn_results
 
-TILE = 12
-
 print("AlienRaid Copyright (C) 2019  Bonzu <bonzupii@protonmail.com>\n"
       "This program comes with ABSOLUTELY NO WARRANTY.\n"
       "This is free software, and you are welcome to redistribute it under\n"
@@ -104,12 +102,18 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
                 if candidate:
                     action = candidate
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                candidate = handle_mouse(event)
-                if candidate:
-                    mouse_action = candidate
-                mouse_tile = (event.pos[0] // TILE, event.pos[1] // TILE)
+                tile = renderer.screen_to_tile(event.pos)
+                if tile is not None:
+                    mouse_tile = tile
+                    candidate = handle_mouse(event, tile)
+                    if candidate:
+                        mouse_action = candidate
             elif event.type == pygame.MOUSEMOTION:
-                mouse_tile = (event.pos[0] // TILE, event.pos[1] // TILE)
+                tile = renderer.screen_to_tile(event.pos)
+                if tile is not None:
+                    mouse_tile = tile
+            elif event.type == pygame.VIDEORESIZE:
+                renderer.resize(event.w, event.h)
 
         if fov_recompute:
             fov_map = _recompute_fov(game_map, player, constants)
@@ -303,14 +307,17 @@ def main():
                     candidate = handle_main_menu(event)
                     if candidate:
                         action = candidate
+                elif event.type == pygame.VIDEORESIZE:
+                    renderer.resize(event.w, event.h)
 
-            main_menu(renderer.screen, renderer.font, background_image,
+            main_menu(renderer.frame, renderer.font, background_image,
                       constants['screen_width'], constants['screen_height'])
 
             if show_load_error_message:
-                message_box(renderer.screen, renderer.font, 'No saved game to load',
+                message_box(renderer.frame, renderer.font, 'No saved game to load',
                             50, constants['screen_width'], constants['screen_height'])
 
+            renderer.present()
             pygame.display.flip()
             clock.tick(30)
 
