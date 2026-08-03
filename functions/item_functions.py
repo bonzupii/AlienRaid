@@ -15,7 +15,7 @@ def _in_fov(fov_map, game_map, x, y):
     return fov_map[y * game_map.width + x] != 0
 
 
-def heal(entity, amount=200):
+def heal(entity, amount=200, entities=None, fov_map=None, game_map=None):
     results = []
     if entity.fighter.hp == entity.fighter.max_hp:
         results.append({'consumed': False, 'message': Message('You are already at full health', C.YELLOW)})
@@ -25,7 +25,7 @@ def heal(entity, amount=200):
     return results
 
 
-def morphine_pack(entity, amount=350):
+def morphine_pack(entity, amount=350, entities=None, fov_map=None, game_map=None):
     results = []
     if entity.fighter.hp == entity.fighter.max_hp:
         results.append({'consumed': False, 'message': Message('You are already at full health', C.YELLOW)})
@@ -35,7 +35,7 @@ def morphine_pack(entity, amount=350):
     return results
 
 
-def gain_xp(entity, amount=400):
+def gain_xp(entity, amount=400, entities=None, fov_map=None, game_map=None):
     return [{'consumed': True, 'xp': amount,
              'message': Message('You scarf down the bush tucker. (gained {0} XP)'.format(amount), C.GREEN)}]
 

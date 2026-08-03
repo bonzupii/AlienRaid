@@ -32,6 +32,7 @@ from functions.death_functions import kill_monster, kill_player
 from functions.systems import wait_action
 from launcher import _handle_take, _collect_ship_part
 from loader_functions.initialize_new_game import get_constants, get_game_variables
+from loader_functions.items import create_item
 from loader_functions.monsters import create_monster
 from map_objects.game_map import GameMap
 from renderer import palette as C
@@ -278,6 +279,26 @@ class TestBoot(unittest.TestCase):
         self.assertFalse(monster.blocks)
         self.assertIsNone(monster.fighter)
         self.assertEqual(monster.sprite_id, 'corpse')
+
+    def test_use_heal_item(self):
+        """Regression: using a med kit through the inventory (exactly as the
+        launcher calls it, with entities/fov_map/game_map kwargs) must heal,
+        not crash with 'heal() got an unexpected keyword argument
+        entities'."""
+        constants, player, entities, game_map, message_log, game_state = fresh_game()
+        player.fighter.hp = player.fighter.max_hp // 2
+        hp_before = player.fighter.hp
+        medkit = create_item('lesser_med_kit', 1, player.x, player.y)
+        player.inventory.add_item(medkit)
+        fov_map = compute_fov(game_map.block_sight, game_map.width, game_map.height,
+                              player.x, player.y, constants['fov_radius'])
+        results = player.inventory.use(medkit, entities=entities,
+                                       fov_map=fov_map, game_map=game_map)
+        self.assertGreater(player.fighter.hp, hp_before, 'med kit did not heal')
+        self.assertTrue(any(r.get('consumed') for r in results),
+                        'med kit was not consumed')
+        self.assertNotIn(medkit, player.inventory.items,
+                         'consumed med kit still in inventory')
 
     def test_echidna_thorns(self):
         """Hitting an echidna pricks the attacker (quill counter-damage)."""

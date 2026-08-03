@@ -46,7 +46,7 @@ class Inventory:
                 for item_use_result in item_use_results:
                     if item_use_result.get('consumed'):
                         self.remove_item(item_entity)
-                    results.extend(item_use_results)
+                results.extend(item_use_results)
 
         return results
 
