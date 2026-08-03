@@ -322,6 +322,11 @@ class Renderer:
         names = ''
         if mouse_tile is not None:
             names = get_names_under_mouse(mouse_tile, entities, fov, game_map)
+        # Clamp the names row so it can never run into the dungeon-level
+        # label (which starts at bar_width + 2) or off the frame edge.
+        max_names = self.constants['bar_width'] - 2
+        if len(names) > max_names:
+            names = names[:max_names - 3] + '...'
         self.font.draw_text(frame, names, 1, row_y(0) // UI_TILE, C.LIGHT_GRAY)
         self.font.draw_text(frame, 'Dungeon level: {0}'.format(game_map.dungeon_level),
                             self.constants['bar_width'] + 2, row_y(0) // UI_TILE, C.LIGHT_GRAY)

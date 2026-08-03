@@ -67,7 +67,7 @@ SAMPLE_COLORS = {
     'trail_up': (120, 160, 60),
     'ship': P.SILVER,
     'part': P.GOLD,
-    'npc_mib': (20, 20, 20),
+    'agent_j_cameo': (20, 20, 20),
     'npc_aecd': (140, 120, 80),
     'npc_swaggie': (160, 90, 60),
     'icon_cross': (255, 30, 0),

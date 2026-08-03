@@ -614,30 +614,6 @@ def _sprite_redback(s, c):
 # ---------------------------------------------------------------------------
 # NPCs (Phase F)
 # ---------------------------------------------------------------------------
-def _sprite_npc_mib(s, c):
-    """Black suit, sunglasses, gold badge glint."""
-    pal = _palette(c)
-    pal['y'] = GOLD
-    _paint(s, [
-        "................",
-        "................",
-        "......oooo......",
-        ".....obbbbo.....",
-        ".....obbbbo.....",
-        ".....okkkko.....",   # sunglasses
-        ".....obbbbo.....",
-        "......obbo......",
-        "....ooooooo.....",
-        "...obbbwbbbo....",   # white shirt
-        "...obybbbbbo....",   # gold badge glint
-        "...obbbkbbbo....",   # black tie
-        "...obbbkbbbo....",
-        "...obbbbbbbo....",
-        "....oo...oo.....",
-        "....oo...oo.....",
-    ], pal)
-
-
 def _sprite_npc_aecd(s, c):
     """Khaki officer with a clipboard."""
     pal = _palette(c)
@@ -683,6 +659,29 @@ def _sprite_npc_swaggie(s, c):
         "...obbbbbbbo....",
         "....oo...oo.....",
         "....oo...oo.....",
+    ], pal)
+
+
+def _sprite_will_smith(s, c):
+    """Will Smith: buzz cut, sunglasses, big smile, black suit."""
+    pal = _palette(c)
+    _paint(s, [
+        "................",
+        ".....kkkkkk.....",   # buzz cut
+        "....kkkkkkkk....",
+        "....kddddddk....",   # hair sheen
+        "....obbbbbbo....",   # forehead
+        "...obbbbbbbbo...",
+        "...okkkkkkkko...",   # sunglasses
+        "...okkbbbbkko...",   # lenses + nose bridge
+        "...obbbbbbbbo...",
+        "....obwwwwbo....",   # the smile
+        "....obbbbbbo....",   # chin
+        ".....obbbbo.....",   # neck
+        "....okwwwwko....",   # suit + shirt
+        "...okwwkkwwko...",   # collar + black tie
+        "...okkkkkkkko...",
+        "...oo....oo.....",   # shoes
     ], pal)
 
 
@@ -1271,7 +1270,7 @@ RECIPES = {
     'redback': _sprite_redback,
     'kanga_rear': _sprite_kanga_rear,
     'cassowary_rear': _sprite_cassowary_rear,
-    'npc_mib': _sprite_npc_mib,
+    'agent_j_cameo': _sprite_will_smith,
     'npc_aecd': _sprite_npc_aecd,
     'npc_swaggie': _sprite_npc_swaggie,
     'corpse': _sprite_corpse,

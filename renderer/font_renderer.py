@@ -3,16 +3,19 @@
 """
 FontRenderer
 
-Renders text with the hand-drawn bitmap font (``alienraid12x12.png``).
+Renders text with the game's font, which is now CODE, not a PNG.
 
-The atlas is a 32x8 grid of 12x12 cells, but the cells are NOT laid out in
-ASCII order — the artist hand-placed every glyph. ``charset_map.json`` (the
-output of ``tools/identify_charset.py``) is the ground truth: it maps each
-character to its atlas cell ``(col, row)``. This renderer looks characters
-up in that map instead of assuming ``code % 32, code // 32``.
+``tools/atlas_to_code.py`` converted the hand-drawn atlas
+(``alienraid12x12.png``) into an exact vectorized reference --
+``renderer/atlas_font.py`` (uniform-color rectangles, verified
+pixel-exact against the atlas at generation time). The runtime font draws
+from those vectors; the PNG atlas is never loaded by the game.
 
-Only characters present in the map are text. Anything else (a mob code, an
-unmapped character) falls back to ``?`` — never to a random glyph.
+``charset_map.json`` (the output of ``tools/identify_charset.py``) is still
+the ground truth for WHICH characters are text: it maps each character to
+its atlas cell ``(col, row)``. Only characters present in the map are text.
+Anything else (a mob code, an unmapped character) falls back to ``?`` --
+never to a random glyph.
 """
 
 import json
@@ -20,32 +23,12 @@ import os
 
 import pygame
 
+from renderer import atlas_font
+
 TILE = 12
 DEFAULT_MAP = 'charset_map.json'
 
 _CHAR_MAP_CACHE = None
-_ATLAS_CACHE = {}
-
-
-def _load_atlas(font_path):
-    """Load the bitmap font once and convert its opaque black background to
-    transparency (brightness-to-alpha, the same conversion
-    ``tools/identify_charset.py`` applies). Without this every glyph blits as
-    a black box — invisible on black panels but visible over coloured UI
-    such as the HP bar. Anti-aliased edges keep a smooth alpha falloff."""
-    atlas = _ATLAS_CACHE.get(font_path)
-    if atlas is None:
-        if pygame.display.get_surface() is None:
-            # A display must exist for convert_alpha(); headless runs get a
-            # 1x1 dummy window (SDL_VIDEODRIVER=dummy).
-            pygame.display.set_mode((1, 1))
-        atlas = pygame.image.load(font_path).convert_alpha()
-        for y in range(atlas.get_height()):
-            for x in range(atlas.get_width()):
-                r, g, b, _ = atlas.get_at((x, y))
-                atlas.set_at((x, y), (r, g, b, max(r, g, b)))
-        _ATLAS_CACHE[font_path] = atlas
-    return atlas
 
 
 def get_char_map(path=DEFAULT_MAP):
@@ -72,22 +55,19 @@ def is_text_glyph(code):
 
 
 class FontRenderer:
-    def __init__(self, font_path='alienraid12x12.png', map_path=DEFAULT_MAP,
-                 tile=TILE):
+    def __init__(self, font_path=None, map_path=DEFAULT_MAP, tile=TILE):
+        """``font_path`` is accepted for compatibility with older callers;
+        the glyphs come from the generated ``renderer/atlas_font.py``, not
+        from a bitmap atlas file."""
         self.tile = tile
-        if not os.path.isfile(font_path):
-            raise FileNotFoundError('Bitmap font not found: {0}'.format(font_path))
+        self.cols = 32  # the atlas grid is 32 columns wide
         if not os.path.isfile(map_path):
             raise FileNotFoundError(
                 'Charset map not found: {0}. Generate it with '
                 'tools/identify_charset.py.'.format(map_path))
-
-        atlas = _load_atlas(font_path)
-        self.cols = atlas.get_width() // tile
         self.char_map = get_char_map(map_path)
         self._glyphs = {}          # (char, color) -> tinted Surface (cached)
         self._ink_rows_cache = {}  # char -> (min_y, max_y) ink rows, or None
-        self._atlas = atlas
 
     def cell_for(self, ch):
         """Atlas cell (col, row) for a character (or str); '?' if unknown."""
@@ -99,7 +79,8 @@ class FontRenderer:
         return (col, row)
 
     def glyph(self, code, color):
-        """Return the (cached) tinted glyph surface for ``code`` in ``color``."""
+        """Return the (cached) tinted glyph surface for ``code`` in
+        ``color``, rasterized from the atlas vectors."""
         ch = chr(code) if isinstance(code, int) else code
         if ch not in self.char_map:
             # Not in the labeled charset: never rendered from the font.
@@ -108,12 +89,10 @@ class FontRenderer:
         cached = self._glyphs.get(key)
         if cached is not None:
             return cached
-
-        col, row = self.char_map[ch]
-        rect = pygame.Rect(col * self.tile, row * self.tile, self.tile, self.tile)
-        glyph = self._atlas.subsurface(rect).copy()
-        # Tint the glyph with the requested color, keeping its alpha.
-        glyph.fill(color, special_flags=pygame.BLEND_RGB_MULT)
+        # atlas_font.rasterize multiplies the stored ink rgb by ``color``
+        # and keeps the ink alpha -- the same tinting the bitmap glyphs
+        # used to get via BLEND_RGB_MULT.
+        glyph = atlas_font.rasterize(ch, 1, color)
         self._glyphs[key] = glyph
         return glyph
 
@@ -123,13 +102,11 @@ class FontRenderer:
         coloured bars."""
         if ch in self._ink_rows_cache:
             return self._ink_rows_cache[ch]
-        col, row = self.char_map[ch]
-        rect = pygame.Rect(col * self.tile, row * self.tile, self.tile, self.tile)
-        cell = self._atlas.subsurface(rect)
+        surf = atlas_font.rasterize(ch, 1, None)
         min_y = max_y = None
         for y in range(self.tile):
             for x in range(self.tile):
-                if cell.get_at((x, y))[3] > 24:
+                if surf.get_at((x, y))[3] > 24:
                     if min_y is None:
                         min_y = y
                     max_y = y

@@ -72,6 +72,12 @@ def _center(surface):
     return surface.get_width() // TILE, surface.get_height() // TILE
 
 
+def _centered_x(surface, text):
+    """Left tile column that horizontally centres ``text`` on the frame."""
+    sw, _sh = _center(surface)
+    return max(1, int(sw / 2 - len(str(text)) / 2))
+
+
 def _draw_box(surface, x, y, width_tiles, height_tiles):
     overlay = pygame.Surface((width_tiles * TILE, height_tiles * TILE), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 195))
@@ -84,9 +90,11 @@ def _wrap(header, width_tiles):
     lines = []
     if not header:
         return lines
+    # width_tiles - 4: the text starts at x + 3 inside the box, so a wrapped
+    # line of width_tiles - 4 chars ends one column inside the right edge.
     for line in header.split('\n'):
         if line:
-            lines.extend(textwrap.wrap(line, max(4, width_tiles - 2)))
+            lines.extend(textwrap.wrap(line, max(4, width_tiles - 4)))
         else:
             lines.append('')
     return lines
@@ -107,11 +115,25 @@ class Menu:
     def draw(self, surface, font, hover=-1, x=None, y=None):
         sw, sh = _center(surface)
         wrapped = _wrap(self.header, self.width)
-        height = len(wrapped) + len(self.options) + 2
+        # Wrap every option (with its (a)/ (b)/... key prefix) so the text
+        # can never overrun the box; a wrapped option spans several rows but
+        # stays a single clickable entry.
+        option_lines = []
+        letter_index = ord('a')
+        for option in self.options:
+            option_lines.append(_wrap('({0}) {1}'.format(chr(letter_index), option),
+                                      self.width))
+            letter_index += 1
+        option_rows = sum(len(lines) for lines in option_lines)
+        height = len(wrapped) + option_rows + 2
         if x is None:
             x = int(sw / 2 - self.width / 2)
         if y is None:
             y = int(sh / 2 - height / 2)
+        # Clamp the box fully inside the frame so menus can never be pushed
+        # off-screen or overlap the frame edge.
+        x = max(1, min(x, max(1, sw - self.width - 1)))
+        y = max(1, min(y, max(1, sh - height - 1)))
         _draw_box(surface, x, y, self.width, height)
         ty = y + 1
         for line in wrapped:
@@ -119,16 +141,18 @@ class Menu:
             ty += 1
         self.rects = []
         letter_index = ord('a')
-        for i, option in enumerate(self.options):
-            text = '({0}) {1}'.format(chr(letter_index), option)
+        for i, lines in enumerate(option_lines):
             color = self.option_colors[i] if i < len(self.option_colors) else C.LIGHT_GRAY
-            if i == hover:
-                font.draw_text(surface, '>', x + 1, ty, C.YELLOW)
-                color = C.WHITE
-            font.draw_text(surface, text, x + 3, ty, color)
-            self.rects.append(pygame.Rect((x + 1) * TILE, ty * TILE,
-                                          (self.width - 2) * TILE, TILE))
-            ty += 1
+            block_top = ty
+            for j, line in enumerate(lines):
+                if i == hover and j == 0:
+                    font.draw_text(surface, '>', x + 1, ty, C.YELLOW)
+                line_color = C.WHITE if i == hover else color
+                font.draw_text(surface, line, x + 3, ty, line_color)
+                ty += 1
+            self.rects.append(pygame.Rect((x + 1) * TILE, block_top * TILE,
+                                          (self.width - 2) * TILE,
+                                          len(lines) * TILE))
             letter_index += 1
         _register(self.rects, self.actions)
         return (x, y, self.width, height)
@@ -244,10 +268,12 @@ def main_menu(surface, font, background_image, screen_width, screen_height):
     sw, sh = _center(surface)
     font.draw_text(surface, 'ALIEN RAID',
                    int(sw / 2 - 5), int(sh / 2 - 8), C.LIGHT_GREEN)
-    font.draw_text(surface, '(C) 2019-2026 By Bonzupii <bonzupii@protonmail.com>',
-                   int(sw / 2 - 36), sh - 2, C.LIGHT_GRAY)
-    font.draw_text(surface, 'Please see the README.md file to learn about game controls.',
-                   int(sw / 2 - 30), sh - 4, C.LIGHT_GRAY)
+    copyright_line = '(C) 2019-2026 By Bonzupii <bonzupii@protonmail.com>'
+    help_line = 'Please see the README.md file to learn about game controls.'
+    font.draw_text(surface, copyright_line, _centered_x(surface, copyright_line),
+                   sh - 2, C.LIGHT_GRAY)
+    font.draw_text(surface, help_line, _centered_x(surface, help_line),
+                   sh - 4, C.LIGHT_GRAY)
     menu(surface, font, '', ['Play a new game', 'Continue last game', 'Quit'],
          24, screen_width, screen_height,
          actions=[{'new_game': True}, {'load_game': True}, {'exit': True}])

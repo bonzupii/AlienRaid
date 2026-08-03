@@ -74,3 +74,23 @@ wind up mighty kicks), timid **Joeys**, skittish **Wallabies**, bruiser
 **Echidnas** (they prick anyone who hits them), venom-spitting **Taipans**,
 fast **Emus**, venomous **Funnel-web Spiders**, unshakeable **Wombats**, swooping
 **Magpies**, lethal **Cassowaries** and ambush **Crocodiles**.
+
+### ALIENRAID PARODY / FAIR-USE NOTICE
+
+AlienRaid is an unofficial, non-commercial, fan-made parody. Its
+Men in Black-inspired elements -- the black-suit agent "J", the
+neuralyzer device, and the "MIB" name -- appear solely for parody
+and homage, under fair-use / fair-dealing principles.
+
+AlienRaid is not affiliated with, endorsed, sponsored, or licensed
+by Sony Pictures, Columbia Pictures, Marvel/Malibu Comics, or any
+other owner of the Men in Black franchise. No claim is made to any
+of their trademarks or copyrights; all such names and elements
+remain the property of their respective owners. The in-game agent
+is an original pixel-art caricature, not a likeness of any real
+actor.
+
+All original AlienRaid content is (C) 2019-2026 Bonzupii, GPLv3.
+
+A personal note: Will Smith, if you're seeing this, big honor. Big fan
+of your work, you handsome studmuffin.

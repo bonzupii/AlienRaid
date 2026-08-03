@@ -34,7 +34,7 @@ from components.game_states import GameStates
 from components.quest import Quest, SHIP_PARTS
 from functions.death_functions import kill_monster, kill_player
 from functions.systems import wait_action
-from launcher import _handle_take, _collect_ship_part
+from functions.game_loop import _handle_take, _collect_ship_part
 from loader_functions.initialize_new_game import get_constants, get_game_variables
 from loader_functions.items import create_item
 from loader_functions.monsters import create_monster

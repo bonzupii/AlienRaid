@@ -106,8 +106,8 @@ class TestOrganicMap(unittest.TestCase):
             self.assertLess(ratio, 0.85, 'map too open on floor {0}'.format(level))
 
     def test_npc_camps(self):
-        # npc_id values are 'mib'/'aecd'/'swaggie' (the sprite_id is the
-        # longer 'npc_*' form); dialogue looks them up by npc_id.
+        # npc_id values are 'mib'/'aecd'/'swaggie' (dialogue looks them up
+        # by npc_id; the MIB agent renders as the 'agent_j_cameo' sprite).
         for level, npc_id in ((MIB_FLOOR, 'mib'),
                               (AECD_FLOOR, 'aecd'),
                               (ROADHOUSE_FLOORS[0], 'swaggie'),

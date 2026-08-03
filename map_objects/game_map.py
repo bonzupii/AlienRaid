@@ -323,7 +323,7 @@ class GameMap:
                 '...wwww.......',
             ], bx, by, occupied=occupied)
             nx, ny = self._find_free_tile(bx + 6, by + 5, entities)
-            entities.append(Entity(nx, ny, 'npc_mib', (20, 20, 20), 'Agent J',
+            entities.append(Entity(nx, ny, 'agent_j_cameo', (20, 20, 20), 'Agent J',
                                    blocks=True, render_order=RenderOrder.ACTOR,
                                    npc_id='mib'))
         if level == AECD_FLOOR:

@@ -35,7 +35,7 @@ def empty_map(w=20, h=20):
 class TestMIB(unittest.TestCase):
     def test_dialogue_choice_moves_reputation(self):
         player = make_player()
-        npc = Entity(5, 5, 'npc_mib', (20, 20, 20), 'Agent J', npc_id='mib')
+        npc = Entity(5, 5, 'agent_j_cameo', (20, 20, 20), 'Agent J', npc_id='mib')
         header, options = get_dialogue(npc, player)
         self.assertEqual(player.reputation.mib, 0)
         choice_key = next(key for _text, key in options if key == 'mib_lost')
@@ -77,6 +77,20 @@ class TestMIB(unittest.TestCase):
                                  fov_map=fov, game_map=gm)
         self.assertFalse(any(r.get('consumed') for r in results))
         self.assertIsNotNone(kanga.ai)
+
+    def test_mib_npc_uses_the_agent_j_cameo_sprite(self):
+        """The in-game Agent J is the parody cameo sprite, and the recipe
+        exists in the sprite registry (no magenta fallback)."""
+        from renderer.sprites import SpriteLoader, RECIPES
+        self.assertIn('agent_j_cameo', RECIPES)
+        surf = SpriteLoader().get('agent_j_cameo', (20, 20, 20))
+        # Black suit on a dark body: the adaptive palette rim-lights it, so
+        # it must have visible ink (not the magenta unknown fallback).
+        magenta = (255, 0, 255)
+        any_ink = any(surf.get_at((x, y))[:3] != magenta
+                      for y in range(surf.get_height())
+                      for x in range(surf.get_width()))
+        self.assertTrue(any_ink, 'cameo sprite fell back to magenta unknown')
 
     def test_epilogue_selection(self):
         player = make_player()

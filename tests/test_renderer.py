@@ -185,7 +185,7 @@ class TestSpriteLoader(unittest.TestCase):
         needed = set(sprite_id for sprite_id, _color, _kind, _data in ITEM_DEFS.values())
         needed |= set(AI_CLASSES)  # species names double as sprite ids
         needed |= {'player', 'corpse', 'trail_down', 'trail_up', 'ship', 'part',
-                   'npc_mib', 'npc_aecd', 'npc_swaggie',
+                   'agent_j_cameo', 'npc_aecd', 'npc_swaggie',
                    'kanga_rear', 'cassowary_rear'}
         missing = needed - set(RECIPES)
         self.assertFalse(missing,
