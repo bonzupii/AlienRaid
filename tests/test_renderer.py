@@ -24,6 +24,7 @@ from renderer.palette import WHITE, PLAYER_GREEN, KANGA_RED
 
 PRESERVED = "0123456789!@#$%^&*()_+=-abcdefghijklmnopqrstuvwxyz" \
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ<>?;:,.[]/'`~{}"
+SPECIAL_GLYPHS = "←↑→↓▲▼◀▶↕↔☐☑○◉"
 
 
 class TestAssets(unittest.TestCase):
@@ -50,17 +51,38 @@ class TestSdlImage(unittest.TestCase):
 
 class TestCharset(unittest.TestCase):
     def test_preserved_chars_are_text(self):
-        for ch in PRESERVED:
+        # Every hand-drawn interface glyph must be labeled text in the map.
+        for ch in PRESERVED + SPECIAL_GLYPHS + ' ':
             self.assertTrue(is_text_glyph(ord(ch)), 'expected text: ' + ch)
-        self.assertTrue(is_text_glyph(ord(' ')))
-        for code in (9, 10, 16, 17, 18, 24, 25, 26, 27, 29, 30, 31, 224, 225):
-            self.assertTrue(is_text_glyph(code), 'expected text: ' + str(code))
+        self.assertTrue(is_text_glyph(' '))
+        self.assertTrue(is_text_glyph('←'))
 
     def test_sprite_codes_are_not_text(self):
-        # Every glyph that was paired with a mob/player/equipment/map.
+        # Chars that were paired with a mob/player/equipment/map (rendered
+        # as sprites) or are plain unmapped symbols are never text.
         for code in (196, 179, 191, 218, 217, 192, 180, 195, 193, 194, 197,
                      205, 186, 187, 201, 188, 200, 185, 204, 176, 177, 178):
             self.assertFalse(is_text_glyph(code), 'expected sprite: ' + str(code))
+        for ch in ('\t', '\n', '¶', '♠'):
+            self.assertFalse(is_text_glyph(ch), 'expected non-text: ' + ch)
+
+    def test_map_drives_cell_lookup(self):
+        """The charset map (artist's hand-labeled layout) determines where
+        each character lives in the atlas — not ASCII code arithmetic."""
+        font = FontRenderer('alienraid12x12.png')
+        # Ground truth from the labeled map: letters sit in rows 4/5 (1-based)
+        # = 0-based rows 3/4, punctuation along row 1, specials in row 3.
+        self.assertEqual(font.cell_for('a'), (0, 3))
+        self.assertEqual(font.cell_for('z'), (25, 3))
+        self.assertEqual(font.cell_for('A'), (0, 4))
+        self.assertEqual(font.cell_for('Z'), (25, 4))
+        self.assertEqual(font.cell_for('!'), (1, 0))
+        self.assertEqual(font.cell_for('0'), (16, 0))
+        self.assertEqual(font.cell_for('←'), (2, 2))
+        self.assertEqual(font.cell_for('☑'), (11, 2))
+        self.assertEqual(font.cell_for(' '), (0, 0))
+        self.assertEqual(font.cell_for('?'), (31, 0))
+        self.assertEqual(font.cell_for(196), font.cell_for('?'))  # fallback
 
 
 class TestFontRenderer(unittest.TestCase):
@@ -84,11 +106,34 @@ class TestFontRenderer(unittest.TestCase):
         font.draw_char(surf, ord('A'), 0, 0, WHITE)
         self.assertGreater(_ink_count(surf), 0, "letter 'A' drew nothing")
 
+    def test_glyphs_differ_by_cell(self):
+        # Different characters must paint different pixels (they live in
+        # different cells), or the map would be mapping two chars to one
+        # glyph.
+        font = FontRenderer('alienraid12x12.png')
+        a_surf = pygame.Surface((12, 12))
+        b_surf = pygame.Surface((12, 12))
+        a_surf.fill((0, 0, 0))
+        b_surf.fill((0, 0, 0))
+        font.draw_char(a_surf, 'a', 0, 0, WHITE)
+        font.draw_char(b_surf, 'b', 0, 0, WHITE)
+        self.assertNotEqual(pygame.image.tostring(a_surf, 'RGB'),
+                            pygame.image.tostring(b_surf, 'RGB'))
+
     def test_fallback_for_sprite_code(self):
         font = FontRenderer('alienraid12x12.png')
         surf = pygame.Surface((12, 12), pygame.SRCALPHA)
-        font.draw_char(surf, 196, 0, 0, WHITE)  # kanga code -> '?' fallback
+        font.draw_char(surf, 196, 0, 0, WHITE)  # unmapped -> '?' fallback
+        self.assertEqual(_ink_count(surf), _ink_count_for('?'))
         # shouldn't crash
+
+
+def _ink_count_for(ch):
+    font = FontRenderer('alienraid12x12.png')
+    surf = pygame.Surface((12, 12), pygame.SRCALPHA)
+    surf.fill((0, 0, 0))
+    font.draw_char(surf, ch, 0, 0, WHITE)
+    return _ink_count(surf)
 
 
 class TestSpriteLoader(unittest.TestCase):

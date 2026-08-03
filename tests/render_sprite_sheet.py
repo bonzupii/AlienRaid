@@ -24,7 +24,7 @@ import pygame
 
 pygame.init()
 
-from renderer.font_renderer import FontRenderer, is_text_glyph
+from renderer.font_renderer import FontRenderer
 from renderer.sprites import SpriteLoader, RECIPES
 from renderer import palette as P
 
@@ -126,29 +126,33 @@ def render_sprite_sheet():
 
 
 def render_charset_sheet():
-    """Reference sheet of the preserved font charset (glyph + code label)."""
+    """Reference sheet of the actual charset: every char in the labeled map
+    (charset_map.json) with its atlas cell coordinates."""
     font = FontRenderer()
-    codes = list(range(32, 127)) + [9, 10, 16, 17, 18, 24, 25, 26, 27, 29, 30, 31, 224, 225]
-    cell_w, cell_h = 5 * TILE, 2 * TILE
+    # Only single-char glyphs are drawable text; multi-char F6 names are
+    # labels, not glyphs, and are skipped.
+    chars = sorted((ch for ch in font.char_map if len(ch) == 1),
+                   key=lambda ch: (font.char_map[ch][1], font.char_map[ch][0]))
+    cell_w, cell_h = 6 * TILE, 2 * TILE
     ccols = 16
-    rows = (len(codes) + ccols - 1) // ccols
+    rows = (len(chars) + ccols - 1) // ccols
     sheet_w = ccols * cell_w + PAD * 2
     sheet_h = PAD * 2 + 2 * TILE + rows * cell_h
     sheet = pygame.Surface((sheet_w, sheet_h))
     sheet.fill((24, 24, 24))
 
-    font.draw_text(sheet, 'Preserved font charset (glyph + code)', PAD // TILE, PAD // TILE, P.WHITE)
+    font.draw_text(sheet, 'Labeled charset (char + atlas cell)',
+                   PAD // TILE, PAD // TILE, P.WHITE)
 
-    for i, code in enumerate(codes):
+    for i, ch in enumerate(chars):
         col = i % ccols
         row = i // ccols
         cx = PAD + col * cell_w
         cy = PAD + 2 * TILE + row * cell_h
-        if is_text_glyph(code):
-            font.draw_char(sheet, code, cx // TILE, cy // TILE, P.WHITE)
-        label = str(code)
-        if 32 <= code <= 126:
-            label += ' ' + chr(code)
+        if ch != ' ':
+            font.draw_char(sheet, ch, cx // TILE, cy // TILE, P.WHITE)
+        col_, row_ = font.char_map[ch]
+        label = repr(ch) + ' {0},{1}'.format(col_, row_)
         font.draw_text(sheet, label, cx // TILE + 2, cy // TILE + 1, P.LIGHT_GRAY)
 
     pygame.image.save(sheet, 'charset_sheet.png')

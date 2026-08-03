@@ -1,0 +1,1320 @@
+{
+  "atlas": "alienraid12x12.png",
+  "cell_size": 12,
+  "cells": {
+    "0_0": {
+      "state": "empty"
+    },
+    "0_1": {
+      "char": "@",
+      "state": "char"
+    },
+    "0_2": {
+      "char": "\u2191",
+      "state": "char"
+    },
+    "0_3": {
+      "char": "a",
+      "state": "char"
+    },
+    "0_4": {
+      "char": "A",
+      "state": "char"
+    },
+    "0_5": {
+      "state": "empty"
+    },
+    "0_6": {
+      "state": "empty"
+    },
+    "0_7": {
+      "state": "empty"
+    },
+    "10_0": {
+      "char": "*",
+      "state": "char"
+    },
+    "10_1": {
+      "char": "~",
+      "state": "char"
+    },
+    "10_2": {
+      "char": "\u2610",
+      "state": "char"
+    },
+    "10_3": {
+      "char": "k",
+      "state": "char"
+    },
+    "10_4": {
+      "char": "K",
+      "state": "char"
+    },
+    "10_5": {
+      "state": "empty"
+    },
+    "10_6": {
+      "state": "empty"
+    },
+    "10_7": {
+      "state": "empty"
+    },
+    "11_0": {
+      "char": "+",
+      "state": "char"
+    },
+    "11_1": {
+      "state": "sprite"
+    },
+    "11_2": {
+      "char": "\u2611",
+      "state": "char"
+    },
+    "11_3": {
+      "char": "l",
+      "state": "char"
+    },
+    "11_4": {
+      "char": "L",
+      "state": "char"
+    },
+    "11_5": {
+      "state": "empty"
+    },
+    "11_6": {
+      "state": "empty"
+    },
+    "11_7": {
+      "state": "empty"
+    },
+    "12_0": {
+      "char": ",",
+      "state": "char"
+    },
+    "12_1": {
+      "state": "sprite"
+    },
+    "12_2": {
+      "char": "\u25cb",
+      "state": "char"
+    },
+    "12_3": {
+      "char": "m",
+      "state": "char"
+    },
+    "12_4": {
+      "char": "M",
+      "state": "char"
+    },
+    "12_5": {
+      "state": "empty"
+    },
+    "12_6": {
+      "state": "empty"
+    },
+    "12_7": {
+      "state": "empty"
+    },
+    "13_0": {
+      "char": "-",
+      "state": "char"
+    },
+    "13_1": {
+      "state": "sprite"
+    },
+    "13_2": {
+      "char": "\u25c9",
+      "state": "char"
+    },
+    "13_3": {
+      "char": "n",
+      "state": "char"
+    },
+    "13_4": {
+      "char": "N",
+      "state": "char"
+    },
+    "13_5": {
+      "state": "empty"
+    },
+    "13_6": {
+      "state": "empty"
+    },
+    "13_7": {
+      "state": "empty"
+    },
+    "14_0": {
+      "char": ".",
+      "state": "char"
+    },
+    "14_1": {
+      "state": "sprite"
+    },
+    "14_2": {
+      "state": "sprite"
+    },
+    "14_3": {
+      "char": "o",
+      "state": "char"
+    },
+    "14_4": {
+      "char": "O",
+      "state": "char"
+    },
+    "14_5": {
+      "state": "empty"
+    },
+    "14_6": {
+      "state": "empty"
+    },
+    "14_7": {
+      "state": "empty"
+    },
+    "15_0": {
+      "char": "/",
+      "state": "char"
+    },
+    "15_1": {
+      "state": "sprite"
+    },
+    "15_2": {
+      "state": "sprite"
+    },
+    "15_3": {
+      "char": "p",
+      "state": "char"
+    },
+    "15_4": {
+      "char": "P",
+      "state": "char"
+    },
+    "15_5": {
+      "state": "empty"
+    },
+    "15_6": {
+      "state": "empty"
+    },
+    "15_7": {
+      "state": "empty"
+    },
+    "16_0": {
+      "char": "0",
+      "state": "char"
+    },
+    "16_1": {
+      "state": "sprite"
+    },
+    "16_2": {
+      "state": "sprite"
+    },
+    "16_3": {
+      "char": "q",
+      "state": "char"
+    },
+    "16_4": {
+      "char": "Q",
+      "state": "char"
+    },
+    "16_5": {
+      "state": "empty"
+    },
+    "16_6": {
+      "state": "empty"
+    },
+    "16_7": {
+      "state": "empty"
+    },
+    "17_0": {
+      "char": "1",
+      "state": "char"
+    },
+    "17_1": {
+      "state": "sprite"
+    },
+    "17_2": {
+      "state": "sprite"
+    },
+    "17_3": {
+      "char": "r",
+      "state": "char"
+    },
+    "17_4": {
+      "char": "R",
+      "state": "char"
+    },
+    "17_5": {
+      "state": "empty"
+    },
+    "17_6": {
+      "state": "empty"
+    },
+    "17_7": {
+      "state": "empty"
+    },
+    "18_0": {
+      "char": "2",
+      "state": "char"
+    },
+    "18_1": {
+      "state": "sprite"
+    },
+    "18_2": {
+      "state": "sprite"
+    },
+    "18_3": {
+      "char": "s",
+      "state": "char"
+    },
+    "18_4": {
+      "char": "S",
+      "state": "char"
+    },
+    "18_5": {
+      "state": "empty"
+    },
+    "18_6": {
+      "state": "empty"
+    },
+    "18_7": {
+      "state": "empty"
+    },
+    "19_0": {
+      "char": "3",
+      "state": "char"
+    },
+    "19_1": {
+      "state": "sprite"
+    },
+    "19_2": {
+      "state": "sprite"
+    },
+    "19_3": {
+      "char": "t",
+      "state": "char"
+    },
+    "19_4": {
+      "char": "T",
+      "state": "char"
+    },
+    "19_5": {
+      "state": "empty"
+    },
+    "19_6": {
+      "state": "empty"
+    },
+    "19_7": {
+      "state": "empty"
+    },
+    "1_0": {
+      "char": "!",
+      "state": "char"
+    },
+    "1_1": {
+      "char": "[",
+      "state": "char"
+    },
+    "1_2": {
+      "char": "\u2193",
+      "state": "char"
+    },
+    "1_3": {
+      "char": "b",
+      "state": "char"
+    },
+    "1_4": {
+      "char": "B",
+      "state": "char"
+    },
+    "1_5": {
+      "state": "empty"
+    },
+    "1_6": {
+      "state": "empty"
+    },
+    "1_7": {
+      "state": "empty"
+    },
+    "20_0": {
+      "char": "4",
+      "state": "char"
+    },
+    "20_1": {
+      "state": "sprite"
+    },
+    "20_2": {
+      "state": "sprite"
+    },
+    "20_3": {
+      "char": "u",
+      "state": "char"
+    },
+    "20_4": {
+      "char": "U",
+      "state": "char"
+    },
+    "20_5": {
+      "state": "empty"
+    },
+    "20_6": {
+      "state": "empty"
+    },
+    "20_7": {
+      "state": "empty"
+    },
+    "21_0": {
+      "char": "5",
+      "state": "char"
+    },
+    "21_1": {
+      "state": "sprite"
+    },
+    "21_2": {
+      "state": "sprite"
+    },
+    "21_3": {
+      "char": "v",
+      "state": "char"
+    },
+    "21_4": {
+      "char": "V",
+      "state": "char"
+    },
+    "21_5": {
+      "state": "empty"
+    },
+    "21_6": {
+      "state": "empty"
+    },
+    "21_7": {
+      "state": "empty"
+    },
+    "22_0": {
+      "char": "6",
+      "state": "char"
+    },
+    "22_1": {
+      "state": "sprite"
+    },
+    "22_2": {
+      "state": "sprite"
+    },
+    "22_3": {
+      "char": "w",
+      "state": "char"
+    },
+    "22_4": {
+      "char": "W",
+      "state": "char"
+    },
+    "22_5": {
+      "state": "empty"
+    },
+    "22_6": {
+      "state": "empty"
+    },
+    "22_7": {
+      "state": "empty"
+    },
+    "23_0": {
+      "char": "7",
+      "state": "char"
+    },
+    "23_1": {
+      "state": "sprite"
+    },
+    "23_2": {
+      "state": "sprite"
+    },
+    "23_3": {
+      "char": "x",
+      "state": "char"
+    },
+    "23_4": {
+      "char": "X",
+      "state": "char"
+    },
+    "23_5": {
+      "state": "empty"
+    },
+    "23_6": {
+      "state": "empty"
+    },
+    "23_7": {
+      "state": "empty"
+    },
+    "24_0": {
+      "char": "8",
+      "state": "char"
+    },
+    "24_1": {
+      "state": "sprite"
+    },
+    "24_2": {
+      "state": "sprite"
+    },
+    "24_3": {
+      "char": "y",
+      "state": "char"
+    },
+    "24_4": {
+      "char": "Y",
+      "state": "char"
+    },
+    "24_5": {
+      "state": "empty"
+    },
+    "24_6": {
+      "state": "empty"
+    },
+    "24_7": {
+      "state": "empty"
+    },
+    "25_0": {
+      "char": "9",
+      "state": "char"
+    },
+    "25_1": {
+      "state": "sprite"
+    },
+    "25_2": {
+      "state": "empty"
+    },
+    "25_3": {
+      "char": "z",
+      "state": "char"
+    },
+    "25_4": {
+      "char": "Z",
+      "state": "char"
+    },
+    "25_5": {
+      "state": "empty"
+    },
+    "25_6": {
+      "state": "empty"
+    },
+    "25_7": {
+      "state": "empty"
+    },
+    "26_0": {
+      "char": ":",
+      "state": "char"
+    },
+    "26_1": {
+      "state": "sprite"
+    },
+    "26_2": {
+      "state": "empty"
+    },
+    "26_3": {
+      "state": "empty"
+    },
+    "26_4": {
+      "state": "empty"
+    },
+    "26_5": {
+      "state": "empty"
+    },
+    "26_6": {
+      "state": "empty"
+    },
+    "26_7": {
+      "state": "empty"
+    },
+    "27_0": {
+      "char": ";",
+      "state": "char"
+    },
+    "27_1": {
+      "state": "sprite"
+    },
+    "27_2": {
+      "state": "empty"
+    },
+    "27_3": {
+      "state": "empty"
+    },
+    "27_4": {
+      "state": "empty"
+    },
+    "27_5": {
+      "state": "empty"
+    },
+    "27_6": {
+      "state": "empty"
+    },
+    "27_7": {
+      "state": "empty"
+    },
+    "28_0": {
+      "char": "<",
+      "state": "char"
+    },
+    "28_1": {
+      "state": "sprite"
+    },
+    "28_2": {
+      "state": "empty"
+    },
+    "28_3": {
+      "state": "empty"
+    },
+    "28_4": {
+      "state": "empty"
+    },
+    "28_5": {
+      "state": "empty"
+    },
+    "28_6": {
+      "state": "empty"
+    },
+    "28_7": {
+      "state": "empty"
+    },
+    "29_0": {
+      "char": "=",
+      "state": "char"
+    },
+    "29_1": {
+      "state": "sprite"
+    },
+    "29_2": {
+      "state": "empty"
+    },
+    "29_3": {
+      "state": "empty"
+    },
+    "29_4": {
+      "state": "empty"
+    },
+    "29_5": {
+      "state": "empty"
+    },
+    "29_6": {
+      "state": "empty"
+    },
+    "29_7": {
+      "state": "empty"
+    },
+    "2_0": {
+      "char": "\"",
+      "state": "char"
+    },
+    "2_1": {
+      "char": "\\",
+      "state": "char"
+    },
+    "2_2": {
+      "char": "\u2190",
+      "state": "char"
+    },
+    "2_3": {
+      "char": "c",
+      "state": "char"
+    },
+    "2_4": {
+      "char": "C",
+      "state": "char"
+    },
+    "2_5": {
+      "state": "empty"
+    },
+    "2_6": {
+      "state": "empty"
+    },
+    "2_7": {
+      "state": "empty"
+    },
+    "30_0": {
+      "char": ">",
+      "state": "char"
+    },
+    "30_1": {
+      "state": "sprite"
+    },
+    "30_2": {
+      "state": "empty"
+    },
+    "30_3": {
+      "state": "empty"
+    },
+    "30_4": {
+      "state": "empty"
+    },
+    "30_5": {
+      "state": "empty"
+    },
+    "30_6": {
+      "state": "empty"
+    },
+    "30_7": {
+      "state": "empty"
+    },
+    "31_0": {
+      "char": "?",
+      "state": "char"
+    },
+    "31_1": {
+      "state": "sprite"
+    },
+    "31_2": {
+      "state": "empty"
+    },
+    "31_3": {
+      "state": "empty"
+    },
+    "31_4": {
+      "state": "empty"
+    },
+    "31_5": {
+      "state": "empty"
+    },
+    "31_6": {
+      "state": "empty"
+    },
+    "31_7": {
+      "state": "empty"
+    },
+    "3_0": {
+      "char": "#",
+      "state": "char"
+    },
+    "3_1": {
+      "char": "]",
+      "state": "char"
+    },
+    "3_2": {
+      "char": "\u2192",
+      "state": "char"
+    },
+    "3_3": {
+      "char": "d",
+      "state": "char"
+    },
+    "3_4": {
+      "char": "D",
+      "state": "char"
+    },
+    "3_5": {
+      "state": "empty"
+    },
+    "3_6": {
+      "state": "empty"
+    },
+    "3_7": {
+      "state": "empty"
+    },
+    "4_0": {
+      "char": "$",
+      "state": "char"
+    },
+    "4_1": {
+      "char": "^",
+      "state": "char"
+    },
+    "4_2": {
+      "char": "\u25b2",
+      "state": "char"
+    },
+    "4_3": {
+      "char": "e",
+      "state": "char"
+    },
+    "4_4": {
+      "char": "E",
+      "state": "char"
+    },
+    "4_5": {
+      "state": "empty"
+    },
+    "4_6": {
+      "state": "empty"
+    },
+    "4_7": {
+      "state": "empty"
+    },
+    "5_0": {
+      "char": "%",
+      "state": "char"
+    },
+    "5_1": {
+      "char": "_",
+      "state": "char"
+    },
+    "5_2": {
+      "char": "\u25bc",
+      "state": "char"
+    },
+    "5_3": {
+      "char": "f",
+      "state": "char"
+    },
+    "5_4": {
+      "char": "F",
+      "state": "char"
+    },
+    "5_5": {
+      "state": "empty"
+    },
+    "5_6": {
+      "state": "empty"
+    },
+    "5_7": {
+      "state": "empty"
+    },
+    "6_0": {
+      "char": "&",
+      "state": "char"
+    },
+    "6_1": {
+      "char": "`",
+      "state": "char"
+    },
+    "6_2": {
+      "char": "\u25c0",
+      "state": "char"
+    },
+    "6_3": {
+      "char": "g",
+      "state": "char"
+    },
+    "6_4": {
+      "char": "G",
+      "state": "char"
+    },
+    "6_5": {
+      "state": "empty"
+    },
+    "6_6": {
+      "state": "empty"
+    },
+    "6_7": {
+      "state": "empty"
+    },
+    "7_0": {
+      "char": "'",
+      "state": "char"
+    },
+    "7_1": {
+      "char": "{",
+      "state": "char"
+    },
+    "7_2": {
+      "char": "\u25b6",
+      "state": "char"
+    },
+    "7_3": {
+      "char": "h",
+      "state": "char"
+    },
+    "7_4": {
+      "char": "H",
+      "state": "char"
+    },
+    "7_5": {
+      "state": "empty"
+    },
+    "7_6": {
+      "state": "empty"
+    },
+    "7_7": {
+      "state": "empty"
+    },
+    "8_0": {
+      "char": "(",
+      "state": "char"
+    },
+    "8_1": {
+      "char": "|",
+      "state": "char"
+    },
+    "8_2": {
+      "char": "\u2195",
+      "state": "char"
+    },
+    "8_3": {
+      "char": "i",
+      "state": "char"
+    },
+    "8_4": {
+      "char": "I",
+      "state": "char"
+    },
+    "8_5": {
+      "state": "empty"
+    },
+    "8_6": {
+      "state": "empty"
+    },
+    "8_7": {
+      "state": "empty"
+    },
+    "9_0": {
+      "char": ")",
+      "state": "char"
+    },
+    "9_1": {
+      "char": "}",
+      "state": "char"
+    },
+    "9_2": {
+      "char": "\u2194",
+      "state": "char"
+    },
+    "9_3": {
+      "char": "j",
+      "state": "char"
+    },
+    "9_4": {
+      "char": "J",
+      "state": "char"
+    },
+    "9_5": {
+      "state": "empty"
+    },
+    "9_6": {
+      "state": "empty"
+    },
+    "9_7": {
+      "state": "empty"
+    }
+  },
+  "char_map": {
+    "!": [
+      1,
+      0
+    ],
+    "\"": [
+      2,
+      0
+    ],
+    "#": [
+      3,
+      0
+    ],
+    "$": [
+      4,
+      0
+    ],
+    "%": [
+      5,
+      0
+    ],
+    "&": [
+      6,
+      0
+    ],
+    "'": [
+      7,
+      0
+    ],
+    "(": [
+      8,
+      0
+    ],
+    ")": [
+      9,
+      0
+    ],
+    "*": [
+      10,
+      0
+    ],
+    "+": [
+      11,
+      0
+    ],
+    ",": [
+      12,
+      0
+    ],
+    "-": [
+      13,
+      0
+    ],
+    ".": [
+      14,
+      0
+    ],
+    "/": [
+      15,
+      0
+    ],
+    "0": [
+      16,
+      0
+    ],
+    "1": [
+      17,
+      0
+    ],
+    "2": [
+      18,
+      0
+    ],
+    "3": [
+      19,
+      0
+    ],
+    "4": [
+      20,
+      0
+    ],
+    "5": [
+      21,
+      0
+    ],
+    "6": [
+      22,
+      0
+    ],
+    "7": [
+      23,
+      0
+    ],
+    "8": [
+      24,
+      0
+    ],
+    "9": [
+      25,
+      0
+    ],
+    ":": [
+      26,
+      0
+    ],
+    ";": [
+      27,
+      0
+    ],
+    "<": [
+      28,
+      0
+    ],
+    "=": [
+      29,
+      0
+    ],
+    ">": [
+      30,
+      0
+    ],
+    "?": [
+      31,
+      0
+    ],
+    "@": [
+      0,
+      1
+    ],
+    "A": [
+      0,
+      4
+    ],
+    "B": [
+      1,
+      4
+    ],
+    "C": [
+      2,
+      4
+    ],
+    "D": [
+      3,
+      4
+    ],
+    "E": [
+      4,
+      4
+    ],
+    "F": [
+      5,
+      4
+    ],
+    "G": [
+      6,
+      4
+    ],
+    "H": [
+      7,
+      4
+    ],
+    "I": [
+      8,
+      4
+    ],
+    "J": [
+      9,
+      4
+    ],
+    "K": [
+      10,
+      4
+    ],
+    "L": [
+      11,
+      4
+    ],
+    "M": [
+      12,
+      4
+    ],
+    "N": [
+      13,
+      4
+    ],
+    "O": [
+      14,
+      4
+    ],
+    "P": [
+      15,
+      4
+    ],
+    "Q": [
+      16,
+      4
+    ],
+    "R": [
+      17,
+      4
+    ],
+    "S": [
+      18,
+      4
+    ],
+    "T": [
+      19,
+      4
+    ],
+    "U": [
+      20,
+      4
+    ],
+    "V": [
+      21,
+      4
+    ],
+    "W": [
+      22,
+      4
+    ],
+    "X": [
+      23,
+      4
+    ],
+    "Y": [
+      24,
+      4
+    ],
+    "Z": [
+      25,
+      4
+    ],
+    "[": [
+      1,
+      1
+    ],
+    "\\": [
+      2,
+      1
+    ],
+    "]": [
+      3,
+      1
+    ],
+    "^": [
+      4,
+      1
+    ],
+    "_": [
+      5,
+      1
+    ],
+    "`": [
+      6,
+      1
+    ],
+    "a": [
+      0,
+      3
+    ],
+    "b": [
+      1,
+      3
+    ],
+    "c": [
+      2,
+      3
+    ],
+    "d": [
+      3,
+      3
+    ],
+    "e": [
+      4,
+      3
+    ],
+    "f": [
+      5,
+      3
+    ],
+    "g": [
+      6,
+      3
+    ],
+    "h": [
+      7,
+      3
+    ],
+    "i": [
+      8,
+      3
+    ],
+    "j": [
+      9,
+      3
+    ],
+    "k": [
+      10,
+      3
+    ],
+    "l": [
+      11,
+      3
+    ],
+    "m": [
+      12,
+      3
+    ],
+    "n": [
+      13,
+      3
+    ],
+    "o": [
+      14,
+      3
+    ],
+    "p": [
+      15,
+      3
+    ],
+    "q": [
+      16,
+      3
+    ],
+    "r": [
+      17,
+      3
+    ],
+    "s": [
+      18,
+      3
+    ],
+    "t": [
+      19,
+      3
+    ],
+    "u": [
+      20,
+      3
+    ],
+    "v": [
+      21,
+      3
+    ],
+    "w": [
+      22,
+      3
+    ],
+    "x": [
+      23,
+      3
+    ],
+    "y": [
+      24,
+      3
+    ],
+    "z": [
+      25,
+      3
+    ],
+    "{": [
+      7,
+      1
+    ],
+    "|": [
+      8,
+      1
+    ],
+    "}": [
+      9,
+      1
+    ],
+    "~": [
+      10,
+      1
+    ],
+    "\u2190": [
+      2,
+      2
+    ],
+    "\u2191": [
+      0,
+      2
+    ],
+    "\u2192": [
+      3,
+      2
+    ],
+    "\u2193": [
+      1,
+      2
+    ],
+    "\u2194": [
+      9,
+      2
+    ],
+    "\u2195": [
+      8,
+      2
+    ],
+    "\u25b2": [
+      4,
+      2
+    ],
+    "\u25b6": [
+      7,
+      2
+    ],
+    "\u25bc": [
+      5,
+      2
+    ],
+    "\u25c0": [
+      6,
+      2
+    ],
+    "\u25c9": [
+      13,
+      2
+    ],
+    "\u25cb": [
+      12,
+      2
+    ],
+    "\u2610": [
+      10,
+      2
+    ],
+    "\u2611": [
+      11,
+      2
+    ]
+  },
+  "cols": 32,
+  "export_dir": "charset_cells",
+  "note": "cells are keyed 0-based (\"col_row\"); the GUI/dry-run show 1-based",
+  "rows": 8
+}
