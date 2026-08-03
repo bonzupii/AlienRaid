@@ -4,7 +4,7 @@
 
 from random import randint
 
-from components.ai import StunnedMonster
+from components.ai import StunnedMonster, DingoAI, FLEE
 from components.game_messages import Message
 from renderer import palette as C
 
@@ -204,6 +204,35 @@ def eat_dropbear_meat(entity, amount=400, entities=None, fov_map=None, game_map=
                     'message': Message('You eat the dropbear meat. You feel invisible... but something stirs.', C.GREEN)})
     results.append({'message': Message('A hungry Dropbear has caught your scent!', C.DARK_RED)})
     return results
+
+
+def use_neuralyzer(entity, entities=None, fov_map=None, game_map=None, noise_map=None):
+    """MIB flash: wipe the memory of visible dingoes and scatter them."""
+    results = []
+    dingo_found = False
+    for e in entities or []:
+        if e.ai and isinstance(e.ai, DingoAI) and _in_fov(fov_map, game_map, e.x, e.y):
+            e.ai.last_seen = None
+            e.ai.state = FLEE
+            e.ai.state_turns = 0
+            dingo_found = True
+
+    if dingo_found:
+        results.append({'consumed': True,
+                        'message': Message(
+                            'FLASH! Their eyes go blank. The dingoes forget you exist and scatter!',
+                            C.CYAN)})
+    else:
+        results.append({'consumed': False,
+                        'message': Message(
+                            'FLASH! High-frequency red light reflects uselessly. (Only affects Dingoes)',
+                            C.LIGHT_RED)})
+    return results
+
+
+def read_datalog(entity, text='', entities=None, fov_map=None, game_map=None, noise_map=None):
+    """Read a log entry without consuming the item."""
+    return [{'consumed': False, 'message': Message(text, C.LIGHT_CYAN)}]
 
 
 def eat_vegemite(entity, amount=150, entities=None, fov_map=None, game_map=None, noise_map=None):

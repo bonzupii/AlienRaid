@@ -6,6 +6,10 @@ These tests assert *content*, not just "not a black screen": the player
 sprite must be painted at the player's tile, the HP bar must be drawn, the
 message log must render text, and the rendered picture must change as the
 game runs.
+
+v4 layout: the map grid is 16px (MAP_TILE), the UI grid is 12px (UI_TILE),
+and the bottom panel lives on the UI grid below the map (panel pixel origin
+= map_height * MAP_TILE).
 """
 import os
 import sys
@@ -36,7 +40,8 @@ from loader_functions.items import create_item
 from loader_functions.monsters import create_monster
 from map_objects.game_map import GameMap
 from renderer import palette as C
-from renderer.renderer import Renderer, build_render_model, TILE
+from renderer.menu_background import generate_menu_background
+from renderer.renderer import Renderer, build_render_model, MAP_TILE, UI_TILE
 
 
 def fresh_game():
@@ -92,18 +97,17 @@ def _frame_sig(surf, step=12, max_y=None):
 
 class TestBoot(unittest.TestCase):
     def test_main_menu_renders(self):
-        """Regression guard: the main menu must render with the real
-        menu_background.png. A paletted (8-bit) background used to crash
-        smoothscale with 'Only 24-bit or 32-bit surfaces can be smoothly
-        scaled'."""
+        """Regression guard: the main menu must render with the procedurally
+        generated background (Phase A: menu_background.png is never loaded
+        at runtime). A paletted (8-bit) background used to crash smoothscale
+        with 'Only 24-bit or 32-bit surfaces can be smoothly scaled' -- so
+        the guard now lives on the GENERATED surface."""
         constants, player, entities, game_map, message_log, game_state = fresh_game()
         renderer = Renderer(constants)
-        if not os.path.isfile('menu_background.png'):
-            self.skipTest('menu_background.png missing')
-        bg = pygame.image.load('menu_background.png')
+        bg = generate_menu_background(renderer.screen_w, renderer.screen_h)
         self.assertGreaterEqual(
             bg.get_bitsize(), 24,
-            'menu background must be a 24/32-bit surface (paletted 8-bit crashes smoothscale)')
+            'generated menu background must be a 24/32-bit surface (8-bit crashes smoothscale)')
         menus.main_menu(renderer.frame, renderer.font, bg,
                         constants['screen_width'], constants['screen_height'])
         renderer.present()
@@ -127,29 +131,33 @@ class TestBoot(unittest.TestCase):
         self.assertIn(_player_tuple(player), build_render_model(entities, fov, game_map))
         self.assertTrue(
             _region_has_color(renderer.frame,
-                              (player.x * TILE, player.y * TILE, TILE, TILE),
+                              (player.x * MAP_TILE, player.y * MAP_TILE,
+                               MAP_TILE, MAP_TILE),
                               player.color),
             'player sprite not painted at its tile')
 
         # Content assertion: the HP bar is drawn (the player starts with hp).
-        panel_y = constants['panel_y']
+        panel_px = constants['map_height'] * MAP_TILE  # panel pixel origin
         self.assertTrue(
             _region_has_color(renderer.frame,
-                              (TILE, (panel_y + 1) * TILE,
-                               constants['bar_width'] * TILE, TILE),
+                              (1 * UI_TILE, panel_px + 1 * UI_TILE,
+                               constants['bar_width'] * UI_TILE, UI_TILE),
                               C.LIGHT_RED),
             'HP bar not painted in the panel')
 
         # Content assertion: the welcome message renders as text in the log.
-        log_x = constants['message_x'] * TILE
-        log_y = (panel_y + 1) * TILE
+        log_x = constants['message_x'] * UI_TILE
+        log_y = panel_px + 1 * UI_TILE
         self.assertGreater(
-            _region_ink(renderer.frame, (log_x, log_y, 40 * TILE, TILE)),
+            _region_ink(renderer.frame, (log_x, log_y, 40 * UI_TILE, UI_TILE)),
             10, 'message log text not rendered')
 
-        # Every other state must render without crashing.
+        # Every other state must render without crashing (including the v4
+        # states: crafting, dialogue, item context menu, popup).
         for state in (GameStates.SHOW_INVENTORY, GameStates.DROP_INVENTORY,
                       GameStates.LEVEL_UP, GameStates.CHARACTER_SCREEN,
+                      GameStates.CRAFTING, GameStates.ITEM_CONTEXT,
+                      GameStates.POPUP, GameStates.DIALOGUE,
                       GameStates.VICTORY, GameStates.PLAYER_DEAD):
             renderer.render(game_map, fov, entities, player, message_log, state, (10, 10))
             pygame.display.flip()
@@ -220,9 +228,9 @@ class TestBoot(unittest.TestCase):
                             GameStates.PLAYERS_TURN, (5, 5))
             pygame.display.flip()
             frame_signatures.add(_frame_sig(renderer.frame,
-                                            max_y=game_map.height * TILE))
+                                            max_y=game_map.height * MAP_TILE))
 
-        # Content assertion: the *map* changed as the world ran — the game
+        # Content assertion: the *map* changed as the world ran -- the game
         # is drawing moving entities and changing FOV, not a static (or
         # black) map. Only the map region is fingerprinted, so a shrinking
         # HP bar in the panel cannot satisfy this on its own.
@@ -340,7 +348,7 @@ class TestBoot(unittest.TestCase):
                    fighter=Fighter(1250, 10, 40), quest=Quest())
         entities = [p]
         gm = GameMap(100, 48, dungeon_level=5)
-        gm.make_map(60, 3, 10, 100, 48, p, entities)
+        gm.make_map(100, 48, p, entities)
         log = MessageLog(32, 66, 6)
         part = next(e for e in entities if e.part_id)
         p.x, p.y = part.x, part.y

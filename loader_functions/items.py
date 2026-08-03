@@ -13,7 +13,8 @@ from functions.item_functions import (heal, morphine_pack, gain_xp,
                                       use_didgeridoo, use_plasma_grenade,
                                       use_stun_grenade, use_ray_gun,
                                       eat_emu_egg, eat_taipan_meat,
-                                      eat_dropbear_meat, eat_vegemite)
+                                      eat_dropbear_meat, eat_vegemite,
+                                      use_neuralyzer, read_datalog)
 from renderer import palette as C
 
 # spawn tables: [chance, min_dungeon_level] pairs
@@ -37,6 +38,8 @@ ITEM_TABLES = {
     'ray_gun':             [[4, 5], [6, 7], [5, 10]],
     'boomerang':           [[0, 4], [10, 6], [8, 9], [5, 13]],
     'didgeridoo':          [[0, 6], [8, 8], [10, 11]],
+    'neuralyzer':          [[0, 11]],  # quest item: only placed by the AECD camp
+    'mib_datalog':         [[0, 6], [5, 10]],
     # equipment
     'tentacruels':               [[5, 4], [6, 7]],
     'energy_shield':             [[10, 5], [8, 9]],
@@ -80,6 +83,10 @@ ITEM_DEFS = {
     'ray_gun':             ('icon_gun', C.RAYGUN_SILVER, 'consume', {'use_function': use_ray_gun, 'damage': 80, 'maximum_range': 11}),
     'boomerang':           ('icon_boomerang', (160, 120, 40), 'consume', {'use_function': use_boomerang, 'damage': 120, 'maximum_range': 8}),
     'didgeridoo':          ('icon_tube', (120, 80, 40), 'consume', {'use_function': use_didgeridoo, 'turns': 6}),
+    'neuralyzer':          ('icon_neuralyzer', C.SILVER, 'consume', {'use_function': use_neuralyzer}),
+    'mib_datalog':         ('icon_datalog', (60, 60, 70), 'consume', {
+        'use_function': read_datalog,
+        'text': 'MIB LOG: Unidentified crash at floor 1. All witnesses to be neuralyzed.'}),
     # equipment --------------------------------------------------------------
     'tentacruels':                ('icon_tentacle', C.PURPLE, 'equip', {'slot': EquipmentSlots.TENTACLE, 'power_bonus': 40}),
     'energy_shield':              ('icon_shield', C.CYAN, 'equip', {'slot': EquipmentSlots.TENTACLE, 'defense_bonus': 50, 'max_hp_bonus': 250}),
@@ -106,6 +113,7 @@ DISPLAY_NAMES = {
     'dropbear_meat': 'Dropbear Meat', 'plasma_grenade': 'Plasma Grenade',
     'stun_grenade': 'Stun Grenade', 'shock_charge': 'Shock Charge',
     'ray_gun': 'Ray Gun', 'boomerang': 'Boomerang', 'didgeridoo': 'Didgeridoo',
+    'neuralyzer': 'Neuralyzer', 'mib_datalog': 'MIB Datalog',
     'tentacruels': 'Tentacruel', 'energy_shield': 'Energy Shield',
     'whippy_willow_twig': 'Whippy Willow Twig', 'taipan_fang_knife': "Taipan Fang Knife",
     'dropbear_claw_gauntlet': 'Dropbear Claw Gauntlet', 'quokka_bone_club': 'Quokka Bone Club',
@@ -130,4 +138,5 @@ def create_item(choice, dungeon_level, x, y):
         item_component = Item(**data)
         item = Entity(x, y, sprite_id, color, name,
                       render_order=RenderOrder.ITEM, item=item_component)
+    item.item_choice = choice
     return item

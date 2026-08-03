@@ -53,7 +53,10 @@ class Inventory:
     def remove_item(self, item):
         self.items.remove(item)
 
-    def drop_item(self, item):
+    def drop_item(self, item, game_map=None, entities=None):
+        """Drop an item onto the map. If the player's tile is blocked by
+        another creature, drop on the nearest adjacent free tile instead
+        (Phase E drop UX)."""
         results = []
         equipment = self.owner.equipment
         equipped = (equipment.top_right_tentacle == item or equipment.top_left_tentacle == item or
@@ -62,8 +65,24 @@ class Inventory:
         if equipped:
             self.owner.equipment.toggle_equip(item)
 
-        item.x = self.owner.x
-        item.y = self.owner.y
+        drop_x, drop_y = self.owner.x, self.owner.y
+        if game_map and entities:
+            blocked_here = any(e is not self.owner and e.blocks
+                               and e.x == drop_x and e.y == drop_y for e in entities)
+            if blocked_here:
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        nx, ny = drop_x + dx, drop_y + dy
+                        if (not game_map.is_blocked(nx, ny) and
+                                not any(e.blocks and e.x == nx and e.y == ny for e in entities)):
+                            drop_x, drop_y = nx, ny
+                            break
+                    else:
+                        continue
+                    break
+
+        item.x = drop_x
+        item.y = drop_y
 
         self.remove_item(item)
         results.append({'item_dropped': item,

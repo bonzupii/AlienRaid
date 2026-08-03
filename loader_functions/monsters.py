@@ -71,6 +71,20 @@ TEMPLATES = {
     'redback':         {'hp': 6, 'power': 8.0, 'def': 0.7, 'xp': 2.5, 'min': 8, 'max': 14, 'color': (40, 20, 20)},
 }
 
+# species -> { item_choice: [[chance, min_level]] } dropped on death (Phase C)
+DROP_TABLES = {
+    'emu':         {'emu_egg': [[100, 1]]},
+    'dropbear':    {'dropbear_meat': [[100, 1]]},
+    'taipan':      {'taipan_meat': [[100, 1]]},
+    'cassowary':   {'cassowary_crest_crown': [[100, 1]]},
+    'crocodile':   {'croc_hide_cuirass': [[100, 1]]},
+    'killer_bee':  {'golden_wattle_salve': [[50, 1]]},
+    'dingo':       {'whippy_willow_twig': [[50, 1]]},
+    'wombat':      {'wombat_hide_cuirass': [[50, 1]]},
+    'echidna':     {'goanna_skin_hat': [[50, 1]]},
+    'kanga':       {'boomerang': [[50, 1]]},
+}
+
 AI_CLASSES = {
     'kanga': KangaAI, 'joey': JoeyAI, 'wallaby': WallabyAI,
     'wallaroo': WallarooAI, 'tree_kanga': TreeKangaAI, 'dingo': DingoAI,
@@ -109,4 +123,5 @@ def create_monster(choice, dungeon_level, x, y):
     monster = Entity(x, y, choice, t['color'], DISPLAY_NAMES[choice],
                      blocks=True, render_order=RenderOrder.ACTOR,
                      fighter=fighter, ai=ai)
+    monster.species = choice
     return monster

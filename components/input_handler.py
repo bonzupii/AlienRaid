@@ -16,18 +16,24 @@ def handle_keys(event, game_state):
 
     if game_state == GameStates.PLAYERS_TURN:
         return handle_player_turn_keys(event)
-    elif game_state == GameStates.PLAYER_DEAD:
-        return handle_player_dead_keys(event)
     elif game_state == GameStates.TARGETING:
         return handle_targeting_keys(event)
     elif game_state in (GameStates.SHOW_INVENTORY, GameStates.DROP_INVENTORY):
         return handle_inventory_keys(event)
+    elif game_state == GameStates.CRAFTING:
+        return handle_crafting_keys(event)
+    elif game_state == GameStates.DIALOGUE:
+        return handle_dialogue_keys(event)
+    elif game_state == GameStates.ITEM_CONTEXT:
+        return handle_context_keys(event)
+    elif game_state == GameStates.POPUP:
+        return handle_popup_keys(event)
     elif game_state == GameStates.LEVEL_UP:
         return handle_level_up_menu(event)
     elif game_state == GameStates.CHARACTER_SCREEN:
         return handle_character_screen(event)
-    elif game_state == GameStates.VICTORY:
-        return handle_victory_keys(event)
+    elif game_state in (GameStates.VICTORY, GameStates.PLAYER_DEAD):
+        return handle_endgame_keys(event)
 
     return {}
 
@@ -74,6 +80,8 @@ def handle_player_turn_keys(event):
         return {'take_trail': True}
     elif ch == 'c':
         return {'show_character_screen': True}
+    elif ch == 'r':
+        return {'show_crafting': True}
     elif ch == 's':
         return {'checkpoint': True}
 
@@ -81,6 +89,8 @@ def handle_player_turn_keys(event):
         return {'fullscreen': True}
     elif event.key == pygame.K_ESCAPE:
         return {'exit': True}
+    elif event.key == pygame.K_F5:
+        return {'show_crafting': True}
 
     return {}
 
@@ -91,9 +101,13 @@ def handle_targeting_keys(event):
     return {}
 
 
-def handle_player_dead_keys(event):
-    if _char(event) == 'i':
-        return {'show_inventory': True}
+def handle_inventory_keys(event):
+    ch = _char(event)
+    if ch and 'a' <= ch <= 'z':
+        return {'inventory_index': ord(ch) - ord('a')}
+
+    if event.key == pygame.K_F5:
+        return {'show_crafting': True}
     if _is_alt_enter(event):
         return {'fullscreen': True}
     elif event.key == pygame.K_ESCAPE:
@@ -101,8 +115,50 @@ def handle_player_dead_keys(event):
     return {}
 
 
-def handle_victory_keys(event):
-    if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
+def handle_crafting_keys(event):
+    ch = _char(event)
+    if ch and 'a' <= ch <= 'z':
+        return {'craft_index': ord(ch) - ord('a')}
+    if event.key == pygame.K_ESCAPE:
+        return {'exit': True}
+    return {}
+
+
+def handle_dialogue_keys(event):
+    ch = _char(event)
+    if ch and 'a' <= ch <= 'z':
+        return {'dialogue_index': ord(ch) - ord('a')}
+    if event.key == pygame.K_ESCAPE:
+        return {'exit': True}
+    return {}
+
+
+def handle_context_keys(event):
+    ch = _char(event)
+    if ch == 'a':
+        return {'context_choice': 'use'}
+    elif ch == 'b':
+        return {'context_choice': 'equip'}
+    elif ch == 'c':
+        return {'context_choice': 'drop'}
+    if event.key == pygame.K_ESCAPE:
+        return {'exit': True}
+    return {}
+
+
+def handle_popup_keys(event):
+    if event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
+        return {'exit': True}
+    return {}
+
+
+def handle_endgame_keys(event):
+    ch = _char(event)
+    if ch == 'a':
+        return {'new_game': True}
+    elif ch == 'b':
+        return {'exit': True}
+    if event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
         return {'exit': True}
     return {}
 
@@ -117,18 +173,6 @@ def handle_mouse(event, tile):
         return {'left_click': tile}
     elif event.button == 3:
         return {'right_click': tile}
-    return {}
-
-
-def handle_inventory_keys(event):
-    ch = _char(event)
-    if ch and 'a' <= ch <= 'z':
-        return {'inventory_index': ord(ch) - ord('a')}
-
-    if _is_alt_enter(event):
-        return {'fullscreen': True}
-    elif event.key == pygame.K_ESCAPE:
-        return {'exit': True}
     return {}
 
 

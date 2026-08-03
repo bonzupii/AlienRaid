@@ -16,7 +16,7 @@ class Entity:
                  render_order=RenderOrder.CORPSE, fighter=None, ai=None,
                  item=None, inventory=None, trail=None, level=None,
                  equipment=None, equippable=None, part_id=None, ship=False,
-                 quest=None):
+                 quest=None, reputation=None, npc_id=None):
         self.x = x
         self.y = y
         self.sprite_id = sprite_id
@@ -35,6 +35,8 @@ class Entity:
         self.part_id = part_id
         self.ship = ship
         self.quest = quest
+        self.reputation = reputation
+        self.npc_id = npc_id
 
         if self.fighter:
             self.fighter.owner = self
@@ -59,6 +61,9 @@ class Entity:
 
         if self.quest:
             self.quest.owner = self
+
+        if self.reputation:
+            self.reputation.owner = self
 
     def move(self, dx, dy):
         self.x += dx

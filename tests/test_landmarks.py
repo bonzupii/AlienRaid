@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), os.pardir))
 from components.entity import Entity
 from components.fighter import Fighter
 from loader_functions.initialize_new_game import biome_for_level
-from map_objects.game_map import GameMap
+from map_objects.game_map import GameMap, MIB_FLOOR, AECD_FLOOR, ROADHOUSE_FLOORS
 
 
 def _find_fence(gm):
@@ -57,7 +57,7 @@ class TestBiomes(unittest.TestCase):
         gm = GameMap(100, 48)
         self.assertIsInstance(gm.brush, bytearray)
         self.assertEqual(len(gm.brush), 100 * 48)
-        gm.make_map(60, 3, 10, 100, 48, player, [player])
+        gm.make_map(100, 48, player, [player])
         # Brush only ever lands on walkable tiles, and always blocks sight.
         for y in range(gm.height):
             for x in range(gm.width):
@@ -75,9 +75,34 @@ class TestBiomes(unittest.TestCase):
             player = Entity(0, 0, 'player', (15, 77, 0), 'P',
                             blocks=True, fighter=Fighter(100, 10, 10))
             gm = GameMap(100, 48, dungeon_level=floor)
-            gm.make_map(60, 3, 10, 100, 48, player, [player])
+            gm.make_map(100, 48, player, [player])
             self.assertTrue(_find_fence(gm),
                             'floor {0} should have a fenced line with a gap'.format(floor))
+
+    def test_npc_camps_spawn(self):
+        """Phase F: MIB camp on floor 6, AECD checkpoint (with the
+        neuralyzer) on floor 11, roadhouse on floors 7 and 14. Each NPC
+        spawns on a walkable tile. (npc_id is 'mib'/'aecd'/'swaggie'; the
+        sprite_id is the longer 'npc_*' form.)"""
+        expected = [(MIB_FLOOR, 'mib', None),
+                    (AECD_FLOOR, 'aecd', 'neuralyzer'),
+                    (ROADHOUSE_FLOORS[0], 'swaggie', None),
+                    (ROADHOUSE_FLOORS[1], 'swaggie', None)]
+        for floor, npc_id, item_choice in expected:
+            player = Entity(0, 0, 'player', (15, 77, 0), 'P',
+                            blocks=True, fighter=Fighter(100, 10, 10))
+            entities = [player]
+            gm = GameMap(100, 48, dungeon_level=floor)
+            gm.make_map(100, 48, player, entities)
+            npcs = [e for e in entities if e.npc_id == npc_id]
+            self.assertEqual(len(npcs), 1,
+                             'floor {0} should host {1}'.format(floor, npc_id))
+            self.assertFalse(gm.is_blocked(npcs[0].x, npcs[0].y))
+            if item_choice:
+                items = [e for e in entities
+                         if getattr(e, 'item_choice', None) == item_choice]
+                self.assertEqual(len(items), 1,
+                                 'floor {0} should hold a {1}'.format(floor, item_choice))
 
 if __name__ == '__main__':
     unittest.main()

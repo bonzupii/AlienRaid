@@ -8,6 +8,7 @@ from components.fighter import Fighter
 from components.inventory import Inventory
 from components.level import Level
 from components.quest import Quest
+from components.reputation import Reputation
 
 from components.entity import Entity
 from components.equipment_slots import EquipmentSlots
@@ -123,15 +124,18 @@ def get_game_variables(constants):
     level_component = Level()
     equipment_component = Equipment()
     quest_component = Quest()
+    reputation_component = Reputation()
 
     player = Entity(0, 0, 'player', C.PLAYER_GREEN, 'Wrpgnyth', blocks=True,
                     render_order=RenderOrder.ACTOR, fighter=fighter_component,
                     inventory=inventory_component, level=level_component,
-                    equipment=equipment_component, quest=quest_component)
+                    equipment=equipment_component, quest=quest_component,
+                    reputation=reputation_component)
     entities = [player]
 
     tentaclaws = Entity(0, 0, 'icon_tentacle', C.RED, 'Tentaclaws',
                         equippable=Equippable(EquipmentSlots.TENTACLE, power_bonus=20))
+    tentaclaws.item_choice = 'tentaclaws'
     player.inventory.add_item(tentaclaws)
     player.equipment.toggle_equip(tentaclaws)
 
@@ -142,9 +146,8 @@ def get_game_variables(constants):
     player.equipment.toggle_equip(sleeve)
 
     game_map = GameMap(constants['map_width'], constants['map_height'])
-    game_map.make_map(constants['max_rooms'], constants['room_min_size'],
-                      constants['room_max_size'], constants['map_width'],
-                      constants['map_height'], player, entities)
+    game_map.make_map(constants['map_width'], constants['map_height'],
+                      player, entities)
 
     message_log = MessageLog(constants['message_x'], constants['message_width'],
                              constants['message_height'])

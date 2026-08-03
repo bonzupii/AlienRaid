@@ -89,7 +89,14 @@ def process_player_turn_results(results, player, entities, game_map, message_log
             if dead_entity == player:
                 message, game_state = kill_player(dead_entity)
             else:
-                message = kill_monster(dead_entity)
+                message, dropped_item = kill_monster(dead_entity,
+                                                     game_map.dungeon_level)
+                if dropped_item:
+                    entities.append(dropped_item)
+                    message_log.add_message(Message(
+                        'The {0} dropped a {1}!'.format(dead_entity.name,
+                                                        dropped_item.name),
+                        C.LIGHT_GREEN))
             message_log.add_message(message)
 
         if item_added:
