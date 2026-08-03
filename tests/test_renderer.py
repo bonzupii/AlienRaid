@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Headless smoke tests for the renderer (run with .venv/bin/python).
+"""Headless smoke tests for the renderer (run with: python -m unittest ...).
 
 Uses SDL_VIDEODRIVER=dummy so no window is needed.
 """
@@ -19,11 +19,21 @@ pygame.init()
 
 from renderer.font_renderer import FontRenderer, is_text_glyph
 from renderer.sprites import SpriteLoader, RECIPES
-from renderer.palette import WHITE, PLAYER_GREEN, KANGA_RED, SILVER
+from renderer.palette import WHITE, PLAYER_GREEN, KANGA_RED
 
 
 PRESERVED = "0123456789!@#$%^&*()_+=-abcdefghijklmnopqrstuvwxyz" \
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ<>?;:,.[]/'`~{}"
+
+
+class TestSdlImage(unittest.TestCase):
+    def test_sdl_image_available(self):
+        # Regression guard. Without SDL_image, pygame.image.load only
+        # understands BMP and the font PNG fails with
+        # "File is not a Windows BMP file". nixpkgs' pygame is built against
+        # nix SDL2_image, so this must be True.
+        self.assertTrue(pygame.image.get_extended(),
+                        'pygame must be built with SDL_image support')
 
 
 class TestCharset(unittest.TestCase):
@@ -44,11 +54,23 @@ class TestCharset(unittest.TestCase):
 class TestFontRenderer(unittest.TestCase):
     def test_load_and_draw(self):
         font = FontRenderer('alienraid12x12.png')
+        # The atlas is a 32x8 grid of 12x12 glyphs.
+        self.assertEqual(font.cols, 32)
+
         surf = pygame.Surface((120 * 12, 8 * 12))
         surf.fill((0, 0, 0))
         font.draw_text(surf, "Alien Raid 0.1a", 0, 0, WHITE)
         font.draw_text(surf, PRESERVED, 0, 2, WHITE)
         self.assertGreater(_ink_count(surf), 1000)
+
+    def test_single_glyph_paints_its_cell(self):
+        # Content assertion: drawing a letter actually paints pixels inside
+        # that glyph's own 12x12 cell.
+        font = FontRenderer('alienraid12x12.png')
+        surf = pygame.Surface((12, 12))
+        surf.fill((0, 0, 0))
+        font.draw_char(surf, ord('A'), 0, 0, WHITE)
+        self.assertGreater(_ink_count(surf), 0, "letter 'A' drew nothing")
 
     def test_fallback_for_sprite_code(self):
         font = FontRenderer('alienraid12x12.png')
@@ -58,15 +80,28 @@ class TestFontRenderer(unittest.TestCase):
 
 
 class TestSpriteLoader(unittest.TestCase):
-    def test_all_recipes_render(self):
+    def test_every_recipe_renders(self):
         loader = SpriteLoader()
-        surf = pygame.Surface((12 * 20, 12 * 12))
-        surf.fill((0, 0, 0))
-        for i, name in enumerate(sorted(RECIPES)):
-            x = (i % 20) * 12
-            y = (i // 20) * 12
-            surf.blit(loader.get(name, KANGA_RED), (x, y))
-        self.assertGreater(_ink_count(surf), 200)
+        for name in sorted(RECIPES):
+            surf = loader.get(name, KANGA_RED)
+            # Content assertion: no recipe may be a blank/transparent tile.
+            self.assertGreater(_ink_count(surf), 0, 'blank sprite: ' + name)
+
+    def test_player_sprite_uses_its_color(self):
+        loader = SpriteLoader()
+        surf = loader.get('player', PLAYER_GREEN)
+        found = False
+        for y in range(surf.get_height()):
+            for x in range(surf.get_width()):
+                r, g, b, a = surf.get_at((x, y))
+                if (abs(r - PLAYER_GREEN[0]) <= 45
+                        and abs(g - PLAYER_GREEN[1]) <= 45
+                        and abs(b - PLAYER_GREEN[2]) <= 45):
+                    found = True
+                    break
+            if found:
+                break
+        self.assertTrue(found, 'player sprite has no pixels in its color')
 
     def test_cache(self):
         loader = SpriteLoader()
@@ -78,11 +113,11 @@ class TestSpriteLoader(unittest.TestCase):
 
 
 def _ink_count(surf):
-    """Count non-black pixels by sampling."""
+    """Count non-black pixels of a surface (full resolution)."""
     w, h = surf.get_size()
     count = 0
-    for y in range(0, h, 2):
-        for x in range(0, w, 2):
+    for y in range(h):
+        for x in range(w):
             r, g, b, *_ = surf.get_at((x, y))
             if r + g + b > 24:
                 count += 1

@@ -1,3 +1,15 @@
+# AlienRaid - install file for people who do NOT use Nix.
+#
+# Nix users: ignore this file. `nix develop` provides python3 + pygame from
+# the nix store (see flake.nix); nothing here is used on NixOS.
+#
+# Without Nix, install the single dependency and run:
+#   uv sync
+#   .venv/bin/python launcher.py
+# or:
+#   pip install pygame
+#   python launcher.py
+
 [project]
 name = "alienraid"
 version = "0.1.0"
@@ -8,8 +20,5 @@ dependencies = [
 ]
 
 [tool.uv]
+# Dependency-only install: do not try to build this project as a package.
 package = false
-# Use the nixpkgs python from the dev shell; never download a generic-linux
-# interpreter (which NixOS cannot execute without nix-ld).
-python-preference = "system"
-python-downloads = "never"

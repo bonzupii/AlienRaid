@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Headless smoke test of the whole game pipeline (run with nix develop)."""
+"""Headless smoke test of the whole game pipeline (run with: nix develop).
+
+These tests assert *content*, not just "not a black screen": the player
+sprite must be painted at the player's tile, the HP bar must be drawn, the
+message log must render text, and the rendered picture must change as the
+game runs.
+"""
 import os
 import sys
 import unittest
@@ -25,8 +31,10 @@ from functions.death_functions import kill_monster, kill_player
 from functions.systems import wait_action
 from launcher import _handle_take, _collect_ship_part
 from loader_functions.initialize_new_game import get_constants, get_game_variables
+from loader_functions.monsters import create_monster
 from map_objects.game_map import GameMap
-from renderer.renderer import Renderer
+from renderer import palette as C
+from renderer.renderer import Renderer, build_render_model, TILE
 
 
 def fresh_game():
@@ -35,18 +43,94 @@ def fresh_game():
     return constants, player, entities, game_map, message_log, game_state
 
 
+def _player_tuple(player):
+    """The exact render-model tuple the renderer must produce for the player."""
+    return (player.x, player.y, 'sprite', player.sprite_id,
+            player.color, player.render_order.value)
+
+
+def _region_ink(surf, rect, step=2):
+    x0, y0, w, h = rect
+    count = 0
+    for yy in range(y0, y0 + h, step):
+        for xx in range(x0, x0 + w, step):
+            r, g, b, *_ = surf.get_at((xx, yy))
+            if r + g + b > 24:
+                count += 1
+    return count
+
+
+def _region_has_color(surf, rect, color, tol=70):
+    x0, y0, w, h = rect
+    for yy in range(y0, y0 + h):
+        for xx in range(x0, x0 + w):
+            r, g, b, *_ = surf.get_at((xx, yy))
+            if (abs(r - color[0]) <= tol and abs(g - color[1]) <= tol
+                    and abs(b - color[2]) <= tol):
+                return True
+    return False
+
+
+def _frame_sig(surf, step=12, max_y=None):
+    """A cheap deterministic fingerprint of a rendered frame.
+
+    Pass ``max_y`` (e.g. the map region only) to exclude the panel, so the
+    fingerprint changes only when the map itself changes.
+    """
+    w, h = surf.get_size()
+    if max_y is not None:
+        h = min(h, max_y)
+    data = bytearray()
+    for yy in range(0, h, step):
+        for xx in range(0, w, step):
+            r, g, b, *_ = surf.get_at((xx, yy))
+            data += bytes((r, g, b))
+    return hash(bytes(data))
+
+
 class TestBoot(unittest.TestCase):
     def test_render_every_state(self):
         constants, player, entities, game_map, message_log, game_state = fresh_game()
         renderer = Renderer(constants)
         fov = compute_fov(game_map.block_sight, game_map.width, game_map.height,
                           player.x, player.y, constants['fov_radius'])
-        for state in (GameStates.PLAYERS_TURN, GameStates.SHOW_INVENTORY,
-                      GameStates.DROP_INVENTORY, GameStates.LEVEL_UP,
-                      GameStates.CHARACTER_SCREEN, GameStates.VICTORY,
-                      GameStates.PLAYER_DEAD):
+
+        renderer.render(game_map, fov, entities, player, message_log,
+                        GameStates.PLAYERS_TURN, (10, 10))
+        pygame.display.flip()
+
+        # Content assertion: the player sprite is in the render model at the
+        # player's tile, and is actually painted on the frame.
+        self.assertIn(_player_tuple(player), build_render_model(entities, fov, game_map))
+        self.assertTrue(
+            _region_has_color(renderer.frame,
+                              (player.x * TILE, player.y * TILE, TILE, TILE),
+                              player.color),
+            'player sprite not painted at its tile')
+
+        # Content assertion: the HP bar is drawn (the player starts with hp).
+        panel_y = constants['panel_y']
+        self.assertTrue(
+            _region_has_color(renderer.frame,
+                              (TILE, (panel_y + 1) * TILE,
+                               constants['bar_width'] * TILE, TILE),
+                              C.LIGHT_RED),
+            'HP bar not painted in the panel')
+
+        # Content assertion: the welcome message renders as text in the log.
+        log_x = constants['message_x'] * TILE
+        log_y = (panel_y + 1) * TILE
+        self.assertGreater(
+            _region_ink(renderer.frame, (log_x, log_y, 40 * TILE, TILE)),
+            10, 'message log text not rendered')
+
+        # Every other state must render without crashing.
+        for state in (GameStates.SHOW_INVENTORY, GameStates.DROP_INVENTORY,
+                      GameStates.LEVEL_UP, GameStates.CHARACTER_SCREEN,
+                      GameStates.VICTORY, GameStates.PLAYER_DEAD):
             renderer.render(game_map, fov, entities, player, message_log, state, (10, 10))
             pygame.display.flip()
+
         # Resize the window (as a tiling WM would) and re-render.
         renderer.resize(900, 700)
         renderer.render(game_map, fov, entities, player, message_log,
@@ -61,23 +145,19 @@ class TestBoot(unittest.TestCase):
         pygame.display.flip()
 
         pygame.image.save(renderer.screen, '/tmp/alienraid_frame.png')
-        # The screen should not be entirely black.
+        # Sanity check on the scaled window surface: not entirely black.
         w, h = renderer.screen.get_size()
-        inked = 0
-        for yy in range(0, h, 6):
-            for xx in range(0, w, 6):
-                r, g, b, *_ = renderer.screen.get_at((xx, yy))
-                if r + g + b > 24:
-                    inked += 1
-        self.assertGreater(inked, 200)
+        self.assertGreater(_region_ink(renderer.screen, (0, 0, w, h), step=6), 200)
 
     def test_simulated_turns(self):
         constants, player, entities, game_map, message_log, game_state = fresh_game()
         renderer = Renderer(constants)
         fov = compute_fov(game_map.block_sight, game_map.width, game_map.height,
                           player.x, player.y, constants['fov_radius'])
+        start_pos = (player.x, player.y)
         kills = 0
         player_dead = False
+        frame_signatures = set()
 
         for _ in range(150):
             dx, dy = randint(-1, 1), randint(-1, 1)
@@ -116,8 +196,27 @@ class TestBoot(unittest.TestCase):
             renderer.render(game_map, fov, entities, player, message_log,
                             GameStates.PLAYERS_TURN, (5, 5))
             pygame.display.flip()
+            frame_signatures.add(_frame_sig(renderer.frame,
+                                            max_y=game_map.height * TILE))
 
-        self.assertTrue(player_dead or kills > 0 or len(entities) > 1)
+        # Content assertion: the *map* changed as the world ran — the game
+        # is drawing moving entities and changing FOV, not a static (or
+        # black) map. Only the map region is fingerprinted, so a shrinking
+        # HP bar in the panel cannot satisfy this on its own.
+        self.assertGreaterEqual(len(frame_signatures), 2,
+                                'map never changed across 150 turns')
+
+        # Something real must have happened: the player moved, fought, or died.
+        self.assertTrue(
+            (player.x, player.y) != start_pos or kills > 0 or player_dead,
+            'no movement, no combat and no death over 150 turns')
+
+        # If the player is still alive, it is still drawn at its tile.
+        if not player_dead:
+            fov = compute_fov(game_map.block_sight, game_map.width, game_map.height,
+                              player.x, player.y, constants['fov_radius'])
+            self.assertIn(_player_tuple(player),
+                          build_render_model(entities, fov, game_map))
 
     def test_wait_action(self):
         constants, player, entities, game_map, message_log, game_state = fresh_game()
@@ -136,6 +235,27 @@ class TestBoot(unittest.TestCase):
         player.fighter.hp = 400
         timer, state = wait_action(player, log, timer)
         self.assertEqual(state, GameStates.PLAYER_DEAD)
+
+    def test_deterministic_combat(self):
+        constants, player, entities, game_map, message_log, game_state = fresh_game()
+        monster = create_monster('joey', 1, player.x + 1, player.y)
+        entities.append(monster)
+        hp_before = monster.fighter.hp
+
+        # Player power (40 base + 40 from starting tentacle gear) always
+        # exceeds a level-1 joey's defense, so this attack must deal damage.
+        results = player.fighter.attack(monster)
+        self.assertLess(monster.fighter.hp, hp_before, 'attack dealt no damage')
+        self.assertTrue(any('message' in r for r in results),
+                        'attack produced no message')
+
+        # Beat it to death; the monster must become a non-blocking corpse.
+        while monster.fighter.hp > 0:
+            player.fighter.attack(monster)
+        kill_monster(monster)
+        self.assertFalse(monster.blocks)
+        self.assertIsNone(monster.fighter)
+        self.assertEqual(monster.sprite_id, 'corpse')
 
     def test_floor_transitions_and_ship(self):
         constants, player, entities, game_map, message_log, game_state = fresh_game()

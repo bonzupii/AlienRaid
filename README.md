@@ -24,12 +24,16 @@ Open a terminal in the game directory and run:
 
 ```sh
 nix develop
-.venv/bin/python launcher.py
+python launcher.py
 ```
 
-The first `nix develop` takes a little while to set everything up. The window is
-resizable — the view scales to fit while keeping the game's aspect ratio, so it
-plays fine no matter how your window manager sizes it.
+The first `nix develop` takes a little while — it builds pygame and the SDL
+libraries from the nix store, and nothing is installed on your system. The
+window is resizable — the view scales to fit while keeping the game's aspect
+ratio, so it plays fine no matter how your window manager sizes it.
+
+Not using Nix? Install Python 3.11+ and pygame (`pip install pygame` or
+`uv sync`), then run `python launcher.py`.
 
 ### Movement keys
 

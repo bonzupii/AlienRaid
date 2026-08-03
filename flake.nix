@@ -14,34 +14,24 @@
       devShells = forAllSystems (system:
         let pkgs = nixpkgs.legacyPackages.${system}; in
         {
+          # Everything comes from the nix store: python3 with pygame compiled
+          # against the nix SDL2 stack (SDL2, SDL2_image, SDL2_ttf, SDL2_mixer,
+          # libGL). No venv, no uv, no pip, nothing touches the host system.
+          # `python` inside this shell already has pygame importable.
           default = pkgs.mkShell {
             packages = with pkgs; [
-              python3
-              uv
+              (python3.withPackages (ps: [ ps.pygame ]))
               SDL2
               SDL2_image
               SDL2_ttf
+              SDL2_mixer
               libGL
             ];
 
-            # Create a local .venv with all project dependencies. No global
-            # installs, nothing touches the host system. uv is pinned to the
-            # nixpkgs python so the interpreter always lives in the nix store
-            # (uv-downloaded pythons cannot run on NixOS without nix-ld).
             shellHook = ''
-              export UV_PYTHON_PREFERENCE=system
-              export UV_PYTHON_DOWNLOADS=never
-              if [ -f pyproject.toml ]; then
-                # If the existing venv is broken or was built on a downloaded
-                # (non-NixOS) interpreter, rebuild it on the nixpkgs python.
-                if ! .venv/bin/python -c 'pass' >/dev/null 2>&1; then
-                  uv venv --clear --python "$(command -v python3)"
-                fi
-                uv sync
-              fi
               echo ""
               echo "AlienRaid dev shell ready."
-              echo "Run the game with:  .venv/bin/python launcher.py"
+              echo "Run the game with:  python launcher.py"
             '';
           };
         });
