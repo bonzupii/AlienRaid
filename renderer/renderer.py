@@ -1,23 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Renderer: the pygame drawing pipeline on TWO grids.
+Renderer: the pygame drawing pipeline on ONE 16px grid.
 
 * The MAP grid is 16px (MAP_TILE): terrain, entities, FOV overlay.
-* The UI grid is 12px (UI_TILE): the hand-drawn font, the bottom panel and
-  every menu. The font is never stretched.
+* The UI grid is ALSO 16px (UI_TILE): the procedural Font16 font, the
+  bottom HUD panel and every menu.
 
 Frame: frame_w = map_width * 16 (1600), frame_h = map_height * 16 +
-panel_height * 12 (852). The panel lives directly below the map on the UI
-grid; panel row r is at y = map_height * 16 + r * 12.
+panel_height * 16 (880). The HUD panel lives directly below the map; panel
+row r is at y = map_height * 16 + r * 16.
 
-* The static *explored* terrain is pre-rendered onto a cached surface once;
-  each frame we blit that cache, then overlay only the FOV-lit tiles and the
-  visible dynamic entities.
-* Walls/floors come in rocky VARIANT SETS (no brick gridlines); a variant is
-  picked deterministically per tile with (x * 7 + y * 13) % n.
-* ``build_render_model`` returns a flat list of tuples
-  ``(x, y, type, sprite_id_or_char, color, layer)`` -- no dicts per entity.
+* The static *explored* terrain is pre-rendered onto a cached surface once
+  per map generation (keyed on ``GameMap.version``, so a regenerated floor
+  at the same dungeon level -- e.g. returning from the floor-4.5 pocket --
+  always rebuilds); each frame we blit that cache, then overlay only the
+  FOV-lit tiles and the visible dynamic entities.
+* The pocket floor (floor 4.5) renders every tile as the magenta unknown
+  sprite, bypassing normal terrain entirely.
+* Walls/floors come in rocky VARIANT SETS (no brick gridlines).
+* The bottom panel is a real HUD: gradient console, recessed HP/XP bars
+  with gloss, a framed quest panel, a framed message-log pane and section
+  dividers -- not text slapped on black.
 * The window is adaptive: everything is drawn to an internal fixed-resolution
   frame which is then letterbox-scaled onto the actual window.
 """
@@ -34,7 +38,7 @@ from renderer.sprites import SpriteLoader
 from renderer import palette as C
 
 MAP_TILE = 16
-UI_TILE = 12
+UI_TILE = 16
 
 
 def build_render_model(entities, fov, game_map):
@@ -73,7 +77,8 @@ class Renderer:
         self._light_floors = None
         self._dark_brush = None
         self._light_brush = None
-        self._cached_level = None
+        self._cached_version = None
+        self._panel_bg = None
         self.fullscreen = False
         self._scale = 1.0
         self._offset = (0, 0)
@@ -157,7 +162,7 @@ class Renderer:
         self._light_floors = self._make_floor_tiles(colors['light_ground'])
         self._dark_brush = self._make_floor_tiles(colors['dark_brush'])
         self._light_brush = self._make_floor_tiles(colors['light_brush'])
-        self._cached_level = game_map.dungeon_level
+        self._cached_version = game_map.version
         width, height = game_map.width, game_map.height
         for y in range(height):
             base = y * width
@@ -178,7 +183,7 @@ class Renderer:
         self.terrain_cache.blit(tile, (x * MAP_TILE, y * MAP_TILE))
 
     def _sync_level(self, game_map):
-        if self.terrain_cache is None or self._cached_level != game_map.dungeon_level:
+        if self.terrain_cache is None or self._cached_version != game_map.version:
             self.rebuild_terrain(game_map)
 
     # ------------------------------------------------------------- window
@@ -234,7 +239,8 @@ class Renderer:
 
     # ------------------------------------------------------------- frame
     def render(self, game_map, fov, entities, player, message_log, game_state,
-               mouse_tile, dialogue=None, popup=None, context_index=None):
+               mouse_tile, dialogue=None, popup=None, context_index=None,
+               popup_scroll=0):
         self._sync_level(game_map)
         # No menu on screen yet: drop any clickable rects left over from a
         # previous frame's menu (death/victory screens register exit/new_game
@@ -243,21 +249,28 @@ class Renderer:
         menus.clear_actions()
         width, height = game_map.width, game_map.height
         map_surf = pygame.Surface((width * MAP_TILE, height * MAP_TILE))
-        map_surf.blit(self.terrain_cache, (0, 0))
-        for y in range(height):
-            base = y * width
-            for x in range(width):
-                if fov[base + x]:
-                    if not game_map.explored[base + x]:
-                        game_map.explored[base + x] = 1
-                        self._stamp_dark(game_map, x, y)
-                    if game_map.is_brush(x, y):
-                        light = self._light_brush[0]
-                    elif game_map.is_wall(x, y):
-                        light = self._variant(self._light_walls, x, y)
-                    else:
-                        light = self._variant(self._light_floors, x, y)
-                    map_surf.blit(light, (x * MAP_TILE, y * MAP_TILE))
+        if getattr(game_map, 'is_pocket', False):
+            # Floor 4.5: every tile is a magenta unknown block.
+            magenta = self.sprites.get('__pocket_tile__', (255, 0, 255))
+            for y in range(height):
+                for x in range(width):
+                    map_surf.blit(magenta, (x * MAP_TILE, y * MAP_TILE))
+        else:
+            map_surf.blit(self.terrain_cache, (0, 0))
+            for y in range(height):
+                base = y * width
+                for x in range(width):
+                    if fov[base + x]:
+                        if not game_map.explored[base + x]:
+                            game_map.explored[base + x] = 1
+                            self._stamp_dark(game_map, x, y)
+                        if game_map.is_brush(x, y):
+                            light = self._light_brush[0]
+                        elif game_map.is_wall(x, y):
+                            light = self._variant(self._light_walls, x, y)
+                        else:
+                            light = self._variant(self._light_floors, x, y)
+                        map_surf.blit(light, (x * MAP_TILE, y * MAP_TILE))
         model = build_render_model(entities, fov, game_map)
         model.sort(key=lambda item: item[5])
         for (x, y, kind, sprite_id, color, _layer) in model:
@@ -298,7 +311,7 @@ class Renderer:
         elif game_state == GameStates.CHARACTER_SCREEN:
             menus.character_screen(self.frame, self.font, player, 44, 20, sw, sh)
         elif game_state == GameStates.POPUP:
-            menus.popup_box(self.frame, self.font, popup or '', sw, sh)
+            menus.popup_box(self.frame, self.font, popup or '', sw, sh, scroll=popup_scroll)
         elif game_state == GameStates.DIALOGUE and dialogue is not None:
             menus.dialogue_menu(self.frame, self.font, dialogue[0], dialogue[1], sw, sh)
         elif game_state == GameStates.VICTORY:
@@ -307,57 +320,104 @@ class Renderer:
             menus.death_overlay(self.frame, self.font, sw, sh)
         self.present()
 
-    # ------------------------------------------------------------- panel
+    # ------------------------------------------------------------- HUD panel
+    def _ensure_panel_bg(self):
+        """Build the console background once: a warm red-dirt gradient with
+        speckle noise, a bezel top edge and the bar divider column."""
+        if self._panel_bg is not None:
+            return
+        w = self.screen_w
+        h = self.constants['panel_height'] * UI_TILE
+        bg = pygame.Surface((w, h))
+        top = (48, 32, 23)
+        mid = (24, 17, 14)
+        bottom = (9, 8, 9)
+        for y in range(h):
+            t = y / max(1, h - 1)
+            if t < 0.5:
+                f = t * 2
+                col = tuple(int(top[i] + (mid[i] - top[i]) * f) for i in range(3))
+            else:
+                f = (t - 0.5) * 2
+                col = tuple(int(mid[i] + (bottom[i] - mid[i]) * f) for i in range(3))
+            pygame.draw.line(bg, col, (0, y), (w, y))
+        rng = random.Random(4242)
+        for _ in range(w * h // 40):
+            x = rng.randrange(w)
+            y = rng.randrange(h)
+            r, g, b = bg.get_at((x, y))[:3]
+            delta = rng.randint(-8, 8)
+            bg.set_at((x, y), (max(0, min(255, r + delta)),
+                               max(0, min(255, g + delta)),
+                               max(0, min(255, b + delta))))
+        # Bezel: light top edge with a dark seam under it.
+        pygame.draw.line(bg, (60, 44, 32), (0, 0), (w, 0))
+        pygame.draw.line(bg, (28, 19, 15), (0, 1), (w, 1))
+        # The bar/log divider column.
+        pygame.draw.line(bg, (36, 25, 20), (self.constants['bar_width'] * UI_TILE, 0),
+                         (self.constants['bar_width'] * UI_TILE, h))
+        self._panel_bg = bg
+
+    def _hud_bar(self, frame, tile_x, py, width, ratio, dark, bright, label):
+        """A recessed HUD bar: dark slot, rim, gloss-topped fill, label."""
+        x0 = tile_x * UI_TILE
+        slot = pygame.Rect(x0, py, width * UI_TILE, UI_TILE)
+        pygame.draw.rect(frame, (12, 10, 10), slot)
+        pygame.draw.rect(frame, (66, 52, 44), slot, 1)
+        fill_w = int(width * UI_TILE * max(0.0, min(1.0, ratio)))
+        if fill_w > 0:
+            fill = pygame.Rect(x0 + 1, py + 1, fill_w - 1, UI_TILE - 2)
+            pygame.draw.rect(frame, dark, fill)
+            bright_h = max(1, int(fill.h * 0.6))
+            pygame.draw.rect(frame, bright, (fill.x, fill.y, fill.w, bright_h))
+            pygame.draw.rect(frame, C.shade(bright, 1.35),
+                             (fill.x, fill.y, fill.w, 1))
+        self.font.draw_text(frame, label, tile_x + 1, py // UI_TILE, C.WHITE,
+                            vertical_center=True)
+
     def _draw_panel(self, game_map, entities, player, message_log, fov, mouse_tile):
         map_px = self.constants['map_height'] * MAP_TILE   # panel pixel origin
         frame = self.frame
-        pygame.draw.rect(frame, (0, 0, 0),
-                         (0, map_px, self.screen_w, self.screen_h - map_px))
+        self._ensure_panel_bg()
+        frame.blit(self._panel_bg, (0, map_px))
+        bar_width = self.constants['bar_width']
 
         def row_y(r):
             return map_px + r * UI_TILE
 
-        # The cursor may legitimately not be over the map yet (no MOUSEMOTION
-        # has fired); that must not crash the panel draw.
+        # Row 0: names (clamped) + dungeon level, split by the divider.
         names = ''
         if mouse_tile is not None:
             names = get_names_under_mouse(mouse_tile, entities, fov, game_map)
-        # Clamp the names row so it can never run into the dungeon-level
-        # label (which starts at bar_width + 2) or off the frame edge.
-        max_names = self.constants['bar_width'] - 2
+        max_names = bar_width - 2
         if len(names) > max_names:
             names = names[:max_names - 3] + '...'
+        if getattr(game_map, 'is_pocket', False):
+            level_text = 'Dungeon level: 4.5'
+        else:
+            level_text = 'Dungeon level: {0}'.format(game_map.dungeon_level)
         self.font.draw_text(frame, names, 1, row_y(0) // UI_TILE, C.LIGHT_GRAY)
-        self.font.draw_text(frame, 'Dungeon level: {0}'.format(game_map.dungeon_level),
-                            self.constants['bar_width'] + 2, row_y(0) // UI_TILE, C.LIGHT_GRAY)
-        # HP bar (row 1)
+        self.font.draw_text(frame, level_text, bar_width + 2, row_y(0) // UI_TILE,
+                            C.LIGHT_GRAY)
+
+        # Rows 1-2: HP / XP bars (left column).
         hp = player.fighter.hp
         max_hp = max(1, player.fighter.max_hp)
-        bar_width = self.constants['bar_width']
-        fill = int(bar_width * hp / max_hp)
-        pygame.draw.rect(frame, C.DARKER_RED,
-                         (1 * UI_TILE, row_y(1), bar_width * UI_TILE, UI_TILE))
-        if fill > 0:
-            pygame.draw.rect(frame, C.LIGHT_RED,
-                             (1 * UI_TILE, row_y(1), fill * UI_TILE, UI_TILE))
-        self.font.draw_text(frame, 'HP: {0}/{1}'.format(hp, max_hp), 2,
-                            row_y(1) // UI_TILE, C.WHITE, vertical_center=True)
-        # XP bar (row 2)
+        self._hud_bar(frame, 1, row_y(1), bar_width, hp / max_hp,
+                      C.DARKER_RED, C.LIGHT_RED,
+                      'HP: {0}/{1}'.format(hp, max_hp))
         xp = player.level.current_xp
         xp_next = max(1, player.level.experience_to_next_level)
-        xp_fill = int(bar_width * min(1.0, xp / xp_next))
-        pygame.draw.rect(frame, C.DARK_BLUE,
-                         (1 * UI_TILE, row_y(2), bar_width * UI_TILE, UI_TILE))
-        if xp_fill > 0:
-            pygame.draw.rect(frame, C.LIGHT_BLUE,
-                             (1 * UI_TILE, row_y(2), xp_fill * UI_TILE, UI_TILE))
-        self.font.draw_text(frame, 'XP: {0}/{1}  Lv {2}'.format(
-            xp, xp_next, player.level.current_level), 2,
-            row_y(2) // UI_TILE, C.WHITE, vertical_center=True)
-        # Ship parts (row 3) + quest tracker with checkboxes (rows 4-5)
+        self._hud_bar(frame, 2, row_y(2), bar_width, min(1.0, xp / xp_next),
+                      C.DARK_BLUE, C.LIGHT_BLUE,
+                      'XP: {0}/{1}  Lv {2}'.format(xp, xp_next, player.level.current_level))
+
+        # Rows 3-5: quest panel (ship parts + part checkboxes).
+        pygame.draw.line(frame, (36, 25, 20), (0, row_y(3) - 2),
+                         (bar_width * UI_TILE, row_y(3) - 2))
         self.font.draw_text(frame, 'Ship parts: {0}/{1}'.format(
-            player.quest.found_count, player.quest.parts_total), 1,
-            row_y(3) // UI_TILE, C.GOLD)
+            player.quest.found_count, player.quest.parts_total),
+            1, row_y(3) // UI_TILE, C.GOLD)
         from components.quest import SHIP_PARTS
         short = {'antimatter_core': 'Core', 'nav_computer': 'Nav',
                  'power_coupling': 'Coupling', 'hull_plating': 'Plating'}
@@ -367,8 +427,21 @@ class Renderer:
                 ('☑' if player.quest.has_part(pid) else '☐') + ' ' + short[pid]
                 for pid in pair)
             self.font.draw_text(frame, line, 1, row_y(4 + r) // UI_TILE, C.LIGHT_GRAY)
-        self.font.draw_text(frame, 'z wait  g grab  . use  i inv  d drop  c char',
+        pygame.draw.line(frame, (36, 25, 20), (0, row_y(6) - 2),
+                         (bar_width * UI_TILE, row_y(6) - 2))
+
+        # Row 6: controls hint.
+        self.font.draw_text(frame, 'z wait  g grab  . use  i inv  d drop  c char  r craft',
                             1, row_y(6) // UI_TILE, C.DARK_GRAY)
+
+        # Right column: framed message-log pane (rows 1-6).
+        log_x0 = (bar_width + 1) * UI_TILE
+        log_x1 = self.screen_w - UI_TILE
+        log_top = row_y(1)
+        log_bot = row_y(self.constants['panel_height'])
+        pygame.draw.rect(frame, (13, 11, 11), (log_x0, log_top, log_x1 - log_x0, log_bot - log_top))
+        pygame.draw.rect(frame, (52, 40, 34), (log_x0, log_top, log_x1 - log_x0, log_bot - log_top), 1)
+        pygame.draw.rect(frame, C.VIOLET, (log_x0, log_top, 2, log_bot - log_top))
         y = row_y(1) // UI_TILE
         for message in message_log.message:
             self.font.draw_text(frame, message.text, message_log.x, y, message.color)

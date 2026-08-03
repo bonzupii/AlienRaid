@@ -15,6 +15,8 @@ class Fighter:
         self.thorns = thorns  # damage dealt back to whoever hits this fighter
         self.base_defense_bonus = base_defense_bonus  # permanent bonus (vegemite)
         self.status = {}  # 'webbed': n, 'speed': n, 'invisible': n, ...
+        # Easter-egg bookkeeping (getattr-guarded at use sites for old saves).
+        self.acquired_taste = False   # 3 vegemite rations: dropbears respect you
 
     @property
     def max_hp(self):

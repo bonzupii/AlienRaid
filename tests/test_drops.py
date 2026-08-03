@@ -18,15 +18,15 @@ class TestDrops(unittest.TestCase):
         new item entity at the corpse's tile."""
         emu = create_monster('emu', 3, 10, 10)
         message, dropped = kill_monster(emu, 3)
-        self.assertIsNotNone(dropped)
-        self.assertEqual(dropped.item_choice, 'emu_egg')
-        self.assertEqual((dropped.x, dropped.y), (10, 10))
+        self.assertTrue(dropped)
+        self.assertEqual(dropped[0].item_choice, 'emu_egg')
+        self.assertEqual((dropped[0].x, dropped[0].y), (10, 10))
 
     def test_cassowary_drops_crown(self):
         cassowary = create_monster('cassowary', 15, 5, 5)
         _, dropped = kill_monster(cassowary, 15)
-        self.assertIsNotNone(dropped)
-        self.assertEqual(dropped.item_choice, 'cassowary_crest_crown')
+        self.assertTrue(dropped)
+        self.assertEqual(dropped[0].item_choice, 'cassowary_crest_crown')
 
     def test_kill_still_turns_monster_into_corpse(self):
         """Drops must not replace the corpse conversion."""
@@ -36,11 +36,16 @@ class TestDrops(unittest.TestCase):
         self.assertIsNone(dingo.fighter)
         self.assertEqual(dingo.sprite_id, 'corpse')
 
-    def test_non_dropping_species_returns_none(self):
+    def test_non_dropping_species_returns_empty_list(self):
         # 'wallaby' has no entry in DROP_TABLES.
         wallaby = create_monster('wallaby', 3, 10, 10)
         _message, dropped = kill_monster(wallaby, 3)
-        self.assertIsNone(dropped)
+        self.assertEqual(dropped, [])
+
+    def test_croc_can_drop_the_esky(self):
+        """The Esky of Holding is a croc drop (alongside the hide)."""
+        self.assertIn('esky_of_holding', DROP_TABLES['crocodile'])
+        self.assertIn('croc_hide_cuirass', DROP_TABLES['crocodile'])
 
     def test_every_drop_table_references_a_real_item(self):
         """Every item_choice in a drop table must be creatable -- a typo'd

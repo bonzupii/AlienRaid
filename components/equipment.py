@@ -113,6 +113,17 @@ class Equipment:
 
 		return bonus
 
+	def wearing_item(self, choice):
+		"""True if any equipped item has the given item_choice (used for
+		gear-based rule hooks: the spare sunglasses, Ned Kelly's
+		breastplate, ...)."""
+		for item in (self.top_right_tentacle, self.top_left_tentacle,
+		             self.bottom_right_tentacle, self.bottom_left_tentacle,
+		             self.chest_plate, self.helmet, self.neck):
+			if item is not None and getattr(item, 'item_choice', None) == choice:
+				return True
+		return False
+
 	def toggle_equip(self, equippable_entity):
 		results = []
 

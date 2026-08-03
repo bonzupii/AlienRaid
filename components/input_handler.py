@@ -7,8 +7,6 @@ import pygame
 
 from components.game_states import GameStates
 
-TILE = 12
-
 
 def handle_keys(event, game_state):
     if event.type != pygame.KEYDOWN:
@@ -147,6 +145,10 @@ def handle_context_keys(event):
 
 
 def handle_popup_keys(event):
+    if event.key in (pygame.K_UP, pygame.K_PAGEUP):
+        return {'popup_scroll': -1}
+    elif event.key in (pygame.K_DOWN, pygame.K_PAGEDOWN):
+        return {'popup_scroll': 1}
     if event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
         return {'exit': True}
     return {}

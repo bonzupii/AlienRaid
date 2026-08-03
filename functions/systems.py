@@ -15,8 +15,17 @@ from functions.death_functions import kill_monster, kill_player
 from renderer import palette as C
 
 
+def _wearing(player, choice):
+    """True if the player is wearing an equipped item with this choice."""
+    eq = getattr(player, 'equipment', None)
+    return bool(eq) and eq.wearing_item(choice)
+
+
 def passive_regen(player, message_log):
-    """Small chance to slowly regenerate a bit of HP while moving."""
+    """Small chance to slowly regenerate a bit of HP while moving. Ned
+    Kelly's breastplate is too heavy to move-and-heal in."""
+    if _wearing(player, 'ned_kelly_breastplate'):
+        return
     if randint(0, 20) != 20:
         return
     if player.fighter.hp >= player.fighter.max_hp:
@@ -31,13 +40,19 @@ def passive_regen(player, message_log):
 
 def wait_action(player, message_log, wait_timer):
     """Rest: heal a chunk of HP, but over-resting summons the Dropbear.
+    With the Acquired Taste the rest-timer dropbear never triggers; Ned
+    Kelly's breastplate halves the healing (too heavy to rest properly).
 
     Returns ``(new_wait_timer, game_state)``.
     """
+    acquired = getattr(player.fighter, 'acquired_taste', False)
+    if acquired:
+        wait_timer = min(wait_timer, 55)
     if wait_timer <= 55:
         wait_timer += 5
         if player.fighter.hp < player.fighter.max_hp:
-            step = max(1, round(player.fighter.max_hp / 50))
+            divisor = 100 if _wearing(player, 'ned_kelly_breastplate') else 50
+            step = max(1, round(player.fighter.max_hp / divisor))
             if player.fighter.hp >= player.fighter.max_hp - step:
                 player.fighter.hp = player.fighter.max_hp
                 message_log.add_message(Message(
@@ -66,8 +81,10 @@ def wait_action(player, message_log, wait_timer):
 
 
 def process_player_turn_results(results, player, entities, game_map, message_log,
-                                game_state, previous_game_state=None):
-    """Apply every player-turn result. Returns ``(game_state, targeting_item)``."""
+                                game_state, previous_game_state=None, wait_timer=0):
+    """Apply every player-turn result. Returns ``(game_state,
+    targeting_item, wait_timer)`` (the timer can be reset by the
+    neuralyzer self-flash)."""
     targeting_item = None
     cancelled = False
 
@@ -81,17 +98,27 @@ def process_player_turn_results(results, player, entities, game_map, message_log
         targeting = result.get('targeting')
         targeting_cancelled = result.get('targeting_cancelled')
         xp = result.get('xp')
+        wait_timer_reset = result.get('wait_timer_reset')
+
+        if wait_timer_reset:
+            wait_timer = 0
 
         if message:
             message_log.add_message(message)
 
         if dead_entity:
+            species = getattr(dead_entity, 'species', None)
             if dead_entity == player:
                 message, game_state = kill_player(dead_entity)
             else:
-                message, dropped_item = kill_monster(dead_entity,
-                                                     game_map.dungeon_level)
-                if dropped_item:
+                message, dropped_items = kill_monster(dead_entity,
+                                                      game_map.dungeon_level)
+                # Escaped ADF bioweapons: culling them dents ADF standing.
+                if species in ('cassowary', 'feral_camel') and player.reputation:
+                    player.reputation.update('adf', -5)
+                    message_log.add_message(Message(
+                        'The ADF will remember this.', C.LIGHT_RED))
+                for dropped_item in dropped_items:
                     entities.append(dropped_item)
                     message_log.add_message(Message(
                         'The {0} dropped a {1}!'.format(dead_entity.name,
@@ -142,4 +169,4 @@ def process_player_turn_results(results, player, entities, game_map, message_log
         game_state = previous_game_state
         targeting_item = None
 
-    return game_state, targeting_item
+    return game_state, targeting_item, wait_timer

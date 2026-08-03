@@ -32,7 +32,7 @@ from renderer.renderer import Renderer
 from loader_functions.initialize_new_game import biome_for_level
 from renderer import palette as P
 
-UI_TILE = 12
+UI_TILE = 16
 SCALE = 4                       # sprite magnification for the sheet
 SPRITE_PX = SPRITE_TILE * SCALE  # 64
 COLS = 6
@@ -45,6 +45,8 @@ PAD = 10
 # they will appear in the game.
 SAMPLE_COLORS = {
     'player': P.PLAYER_GREEN,
+    'player_sunglasses': P.PLAYER_GREEN,
+    'ute': (140, 90, 60),
     'kanga': P.KANGA_RED,
     'joey': P.KANGA_RED,
     'wallaby': (205, 133, 63),

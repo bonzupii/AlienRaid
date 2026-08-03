@@ -80,15 +80,14 @@ class TestBiomes(unittest.TestCase):
                             'floor {0} should have a fenced line with a gap'.format(floor))
 
     def test_npc_camps_spawn(self):
-        """Phase F: MIB camp on floor 6, AECD checkpoint (with the
-        neuralyzer) on floor 11, roadhouse on floors 7 and 14. Each NPC
-        spawns on a walkable tile. (npc_id is 'mib'/'aecd'/'swaggie'; the
-        sprite_id is the longer 'npc_*' form.)"""
-        expected = [(MIB_FLOOR, 'mib', None),
-                    (AECD_FLOOR, 'aecd', 'neuralyzer'),
-                    (ROADHOUSE_FLOORS[0], 'swaggie', None),
-                    (ROADHOUSE_FLOORS[1], 'swaggie', None)]
-        for floor, npc_id, item_choice in expected:
+        """Phase F: MIB camp on floor 12, AECD checkpoint on floor 11,
+        roadhouse on floors 7 and 14. Each NPC spawns on a walkable tile.
+        (npc_id is 'mib'/'aecd'/'swaggie'; the MIB agent renders as the
+        'agent_j_cameo' sprite.)"""
+        expected = [(MIB_FLOOR, 'mib'), (AECD_FLOOR, 'aecd'),
+                    (ROADHOUSE_FLOORS[0], 'swaggie'),
+                    (ROADHOUSE_FLOORS[1], 'swaggie')]
+        for floor, npc_id in expected:
             player = Entity(0, 0, 'player', (15, 77, 0), 'P',
                             blocks=True, fighter=Fighter(100, 10, 10))
             entities = [player]
@@ -98,11 +97,20 @@ class TestBiomes(unittest.TestCase):
             self.assertEqual(len(npcs), 1,
                              'floor {0} should host {1}'.format(floor, npc_id))
             self.assertFalse(gm.is_blocked(npcs[0].x, npcs[0].y))
-            if item_choice:
-                items = [e for e in entities
-                         if getattr(e, 'item_choice', None) == item_choice]
-                self.assertEqual(len(items), 1,
-                                 'floor {0} should hold a {1}'.format(floor, item_choice))
+
+    def test_aecd_holds_the_neuralyzer(self):
+        """The AECD officer holds the confiscated neuralyzer -- it must not
+        be lying free in the camp for the taking (it is granted via the
+        bribe dialogue choice instead)."""
+        player = Entity(0, 0, 'player', (15, 77, 0), 'P',
+                        blocks=True, fighter=Fighter(100, 10, 10))
+        entities = [player]
+        gm = GameMap(100, 48, dungeon_level=AECD_FLOOR)
+        gm.make_map(100, 48, player, entities)
+        free = [e for e in entities
+                if getattr(e, 'item_choice', None) == 'neuralyzer']
+        self.assertEqual(len(free), 0,
+                         'the neuralyzer must be held, not left on the ground')
 
 if __name__ == '__main__':
     unittest.main()

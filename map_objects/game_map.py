@@ -17,6 +17,7 @@ player has seen, ``brush`` = scrub that blocks sight but not movement.
 """
 from random import randint, shuffle
 
+from components.ai import HUNT
 from components.trail import Trail
 from components.quest import SHIP_PARTS, PART_COLORS
 from components.entity import Entity
@@ -32,10 +33,14 @@ PART_FLOORS = [5, 10, 15, 20]
 TRAIL_DOWN_COLOR = (180, 120, 40)
 TRAIL_UP_COLOR = (120, 160, 60)
 
-# NPC landmark floors (Phase F)
-MIB_FLOOR = 6
+# NPC landmark floors (Phase F). Agent J sits on 12 so the quest flows
+# downward: parts on 5/10, the neuralyzer on 11, J on 12, parts on 15/20.
+MIB_FLOOR = 12
 AECD_FLOOR = 11
 ROADHOUSE_FLOORS = (7, 14)
+
+# Floor 4.5: the pocket dimension marker used by the mystery trail.
+POCKET_FLOOR = '4.5'
 
 
 class GameMap:
@@ -47,6 +52,14 @@ class GameMap:
         self.block_sight = bytearray([1]) * (width * height)
         self.explored = bytearray(width * height)
         self.brush = bytearray(width * height)
+        # Renderer cache key: bumped whenever the floor is regenerated so
+        # the pre-rendered terrain cache always rebuilds.
+        self.version = 1
+        # Per-floor easter-egg state (reset on every new level).
+        self.is_pocket = False        # floor 4.5 renders as magenta unknown tiles
+        self.land_dispute = False     # cassowary vs kanga, once per floor
+        self.swooping = False         # spring swoop, once per floor
+        self.emu_war_memorial = False # floor 13 landmark pre-aggros emus
 
     # ------------------------------------------------------------- tile utils
     def idx(self, x, y):
@@ -306,6 +319,55 @@ class GameMap:
                     '############',
                     '.##########.',
                 ], kx, ky, occupied=occupied)
+        # Emu War memorial (rare, floor 13): a rusted machine-gun nest with
+        # a plaque and a locked chest holding Ned Kelly's breastplate. The
+        # emus on that floor spawn pre-aggro'd, out of principle.
+        if level == 13 and randint(1, 100) <= 30:
+            self.emu_war_memorial = True
+            self._place_emu_memorial(entities)
+        # The rusty ute: a slab of warm tinnies in the tray (floors 1-5).
+        if level <= 5 and randint(1, 100) <= 30:
+            self._place_rusty_ute(entities)
+
+    def _place_emu_memorial(self, entities):
+        """The Emu War memorial: a rusted machine-gun nest with a plaque and
+        a sealed chest (Ned Kelly's breastplate) under the wreckage."""
+        mx = randint(8, self.width - 18)
+        my = randint(8, self.height - 14)
+        self._stamp([
+            '...###...',
+            '..#####..',
+            '.##...##.',
+            '.#..#..#.',
+            '.#..#..#.',
+            '.##...##.',
+            '..#####..',
+            '...###...',
+        ], mx, my)
+        plaque_x, plaque_y = self._find_free_tile(mx + 2, my + 2, entities)
+        entities.append(create_item('emu_war_plaque', self.dungeon_level,
+                                    plaque_x, plaque_y))
+        chest_x, chest_y = self._find_free_tile(mx + 6, my + 4, entities)
+        entities.append(create_item('ned_kelly_chest', self.dungeon_level,
+                                    chest_x, chest_y))
+
+    def _place_rusty_ute(self, entities):
+        """A rusted ute with a slab of warm tinnies in the tray."""
+        ux = randint(8, self.width - 18)
+        uy = randint(8, self.height - 10)
+        self._stamp([
+            '....####....',
+            '...######...',
+            '..########.',
+            '..########.',
+        ], ux, uy)
+        ute_x, ute_y = self._find_free_tile(ux + 4, uy + 2, entities)
+        entities.append(Entity(ute_x, ute_y, 'ute', (140, 90, 60),
+                               'Rusty ute', blocks=True,
+                               render_order=RenderOrder.ACTOR))
+        for dx in (-3, 0, 3):
+            tx, ty = self._find_free_tile(ute_x + dx, ute_y + 1, entities)
+            entities.append(create_item('tinny', self.dungeon_level, tx, ty))
 
     # ------------------------------------------------- NPC camps (Phase F)
     def _place_npc_camps(self, entities):
@@ -339,8 +401,8 @@ class GameMap:
             entities.append(Entity(nx, ny, 'npc_aecd', (140, 120, 80), 'AECD Officer',
                                    blocks=True, render_order=RenderOrder.ACTOR,
                                    npc_id='aecd'))
-            ix, iy = self._find_free_tile(cx + 8, cy + 2, entities)
-            entities.append(create_item('neuralyzer', level, ix, iy))
+            # The Officer HOLDS the confiscated neuralyzer; the player must
+            # bribe it out of them (see functions/dialogue.py).
         if level in ROADHOUSE_FLOORS:
             rx = randint(6, self.width - 16)
             ry = randint(6, self.height - 12)
@@ -357,7 +419,10 @@ class GameMap:
                                    npc_id='swaggie'))
 
     def _place_brush(self, entities):
-        """Scatter sight-blocking scrub on open ground (dappled FOV)."""
+        """Scatter sight-blocking scrub in small CLUSTERS on open ground.
+        Clustered scrub (rather than independent 1-in-N tiles) keeps the
+        shadowcast FOV readable: a lone 1x1 bush used to carve jagged
+        blind spots mid-room, a clump reads as a deliberate thicket."""
         if self.dungeon_level <= 5:
             density = 15
         elif self.dungeon_level <= 10:
@@ -366,13 +431,22 @@ class GameMap:
             density = 5
         else:
             density = 2
-        for y in range(1, self.height - 1):
-            for x in range(1, self.width - 1):
+        w, h = self.width, self.height
+        occupied = {(e.x, e.y) for e in entities}
+        # Cluster count scaled by the per-floor density, seeded from it so
+        # higher density = more, larger thickets.
+        clusters = max(1, (density * w * h) // 9000)
+        for _ in range(clusters):
+            cx = randint(4, w - 5)
+            cy = randint(4, h - 5)
+            size = randint(2, max(2, density // 4))
+            for _ in range(size):
+                x = cx + randint(-2, 2)
+                y = cy + randint(-2, 2)
                 idx = self.idx(x, y)
-                if self.blocked[idx] == 0 and randint(1, 100) <= density:
-                    if not any(e.x == x and e.y == y for e in entities):
-                        self.brush[idx] = 1
-                        self.block_sight[idx] = 1
+                if self.blocked[idx] == 0 and (x, y) not in occupied:
+                    self.brush[idx] = 1
+                    self.block_sight[idx] = 1
 
     def place_entities(self, player, entities):
         """Scatter monsters/items on random reachable free tiles with a
@@ -406,7 +480,13 @@ class GameMap:
             if any(abs(x - px) + abs(y - py) < 4 for (px, py) in placed):
                 continue
             choice = random_choice_from_dict(monster_chances)
-            entities.append(create_monster(choice, level, x, y))
+            monster = create_monster(choice, level, x, y)
+            # Emu War memorial floor: the emus spawn pre-aggro'd toward the
+            # player, out of principle.
+            if self.emu_war_memorial and choice == 'emu':
+                monster.ai.last_seen = (player.x, player.y)
+                monster.ai.state = HUNT
+            entities.append(monster)
             placed.append((x, y))
 
         placed = []
@@ -442,12 +522,25 @@ class GameMap:
                                 trail=Trail(direction='down', floor=self.dungeon_level + 1))
             entities.append(down_trail)
 
-        # The crashed ship on the surface (floor 1).
+        # The crashed ship on the surface (floor 1), plus the black box
+        # lying beside it.
         if self.dungeon_level == 1:
             sx, sy = self._find_free_tile(last_x, last_y + 1, entities)
             ship = Entity(sx, sy, 'ship', C.SILVER, 'Your crashed ship',
                           render_order=RenderOrder.SHIP, ship=True)
             entities.append(ship)
+            bx, by = self._find_free_tile(sx + 1, sy + 1, entities)
+            entities.append(create_item('black_box', 1, bx, by))
+
+        # The mystery trail to floor 4.5 (very rare, fixed to the first
+        # part floor so it can only be found once per generation).
+        if self.dungeon_level == 5 and randint(1, 100) <= 20:
+            tx, ty = self._find_free_tile(first_x, first_y + 2, entities)
+            mystery = Entity(tx, ty, 'trail_down', (190, 80, 200),
+                             'Mysterious trail',
+                             render_order=RenderOrder.TRAIL,
+                             trail=Trail(direction='down', floor=POCKET_FLOOR))
+            entities.append(mystery)
 
         # Salvageable ship part (wreckage) on the part floors.
         if self.dungeon_level in PART_FLOORS:
@@ -459,28 +552,72 @@ class GameMap:
             entities.append(part)
 
     # ------------------------------------------------------------ transitions
-    def go_down(self, player, message_log, constants):
-        self.dungeon_level += 1
+    def go_down(self, player, message_log, constants, floor=None):
+        """Descend. ``floor`` comes from the trail being used (so the
+        mystery trail can dive to the 4.5 pocket); default is +1."""
+        target = floor if floor is not None else self.dungeon_level + 1
+        if target == POCKET_FLOOR:
+            return self._enter_pocket(player, message_log, constants)
+        self.dungeon_level = target
         from loader_functions.initialize_new_game import biome_for_level
         constants.setdefault('colors', {}).update(biome_for_level(self.dungeon_level))
         entities = self._new_level(player, message_log, constants, start_at='first', heal=True)
         message_log.add_message(Message('You take the trail and descend into the darkness.', C.LIGHT_VIOLET))
         return entities
 
-    def go_up(self, player, message_log, constants):
-        self.dungeon_level -= 1
+    def go_up(self, player, message_log, constants, floor=None):
+        """Ascend. ``floor`` comes from the trail (the pocket's exit trail
+        returns to floor 5); default is -1."""
+        target = floor if floor is not None else self.dungeon_level - 1
+        self.dungeon_level = target
         from loader_functions.initialize_new_game import biome_for_level
         constants.setdefault('colors', {}).update(biome_for_level(self.dungeon_level))
         entities = self._new_level(player, message_log, constants, start_at='last', heal=False)
         message_log.add_message(Message('You climb back toward the surface.', C.LIGHT_GREEN))
         return entities
 
+    def _enter_pocket(self, player, message_log, constants):
+        """Floor 4.5: a tiny pocket dimension of magenta unknown tiles
+        holding exactly one item -- the developer's mug. The renderer
+        paints every tile with the unknown sprite while ``is_pocket``."""
+        entities = [player]
+        self.is_pocket = True
+        w, h = 24, 18
+        self.width, self.height = w, h
+        self.blocked = bytearray([0]) * (w * h)
+        self.block_sight = bytearray([0]) * (w * h)
+        self.explored = bytearray(w * h)
+        self.brush = bytearray(w * h)
+        self.version += 1
+        cx, cy = w // 2, h // 2
+        player.x, player.y = cx, cy
+        mug_x, mug_y = self._find_free_tile(cx + 5, cy, entities)
+        entities.append(create_item('dev_mug', 4, mug_x, mug_y))
+        up_x, up_y = self._find_free_tile(cx - 5, cy, entities)
+        up_trail = Entity(up_x, up_y, 'trail_up', TRAIL_UP_COLOR, 'Trail back',
+                          render_order=RenderOrder.TRAIL,
+                          trail=Trail(direction='up', floor=5))
+        entities.append(up_trail)
+        message_log.add_message(Message(
+            'You push through a curtain of scrub into a space that should not exist.',
+            C.LIGHT_VIOLET))
+        return entities
+
     def _new_level(self, player, message_log, constants, start_at='first', heal=True):
         entities = [player]
+        # Restore the standard map dimensions (the pocket floor shrinks the
+        # map; leaving it must grow it back) and reset per-floor egg state.
+        self.width = constants['map_width']
+        self.height = constants['map_height']
+        self.is_pocket = False
+        self.land_dispute = False
+        self.swooping = False
+        self.emu_war_memorial = False
         self.blocked = bytearray([1]) * (self.width * self.height)
         self.block_sight = bytearray([1]) * (self.width * self.height)
         self.explored = bytearray(self.width * self.height)
         self.brush = bytearray(self.width * self.height)
+        self.version += 1
         self.make_map(constants['map_width'], constants['map_height'],
                       player, entities, start_at=start_at)
         if heal:

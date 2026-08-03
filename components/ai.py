@@ -122,7 +122,8 @@ class HeuristicMonster:
         in_fov = _in_fov(fov_map, game_map, monster.x, monster.y)
         if in_fov:
             self.last_seen = (target.x, target.y)
-        elif self.SMELL and monster.distance_to(target) <= self.SMELL:
+        elif self.SMELL and self._can_smell(target) \
+                and monster.distance_to(target) <= self.SMELL:
             # Scent-trackers (dingoes) shadow the player without sight.
             self.last_seen = (target.x, target.y)
             in_fov = True
@@ -191,6 +192,11 @@ class HeuristicMonster:
             if monster.distance_to(effective_target) < 2:
                 break
         return results
+
+    def _can_smell(self, target):
+        """Whether the target is trackable by scent (dingoes). The spare
+        sunglasses make the player too cool to track."""
+        return True
 
     # ------------------------------------------------------------ to override
     def _special_turn(self, target, fov_map, game_map, entities, dist):
@@ -432,6 +438,13 @@ class DingoAI(HeuristicMonster):
     ERRATIC = 0.3
     SMELL = 8  # can smell the player from far away
 
+    def _can_smell(self, target):
+        # Too cool to track: the spare sunglasses break the scent.
+        eq = getattr(target, 'equipment', None)
+        if eq is None:
+            return True
+        return not eq.wearing_item('spare_sunglasses')
+
     def _special_turn(self, target, fov_map, game_map, entities, dist):
         results = []
         if dist > 6 and randint(0, 25) == 0:
@@ -480,10 +493,24 @@ class DropbearAI(HeuristicMonster):
     def __init__(self):
         super().__init__()
         self.pounce_cooldown = 0
+        self.respect_shown = False
+
+    def _should_attack(self, target, game_map, entities):
+        # Acquired taste: the dropbears respect the smell and never ambush.
+        if getattr(target.fighter, 'acquired_taste', False):
+            return False
+        return super()._should_attack(target, game_map, entities)
 
     def _special_turn(self, target, fov_map, game_map, entities, dist):
         results = []
         monster = self.owner
+        if getattr(target.fighter, 'acquired_taste', False):
+            if not self.respect_shown:
+                self.respect_shown = True
+                results.append({'message': Message(
+                    'The Dropbear sniffs you and backs off. It respects the smell now.',
+                    C.LIGHT_GRAY)})
+            return results
         self.pounce_cooldown = max(0, self.pounce_cooldown - 1)
         if self.pounce_cooldown == 0 and dist <= 5 and dist >= 2:
             # Leapt up to 2 tiles along the approach, then attack with bonus.
@@ -574,10 +601,14 @@ class MagpieAI(HeuristicMonster):
     def __init__(self):
         super().__init__()
         self.swoop_cooldown = 0
+        self.season_swoop = False   # spring: one forced simultaneous swoop
 
     def _special_turn(self, target, fov_map, game_map, entities, dist):
         results = []
         monster = self.owner
+        if self.season_swoop:       # swooping season forces the dive
+            self.swoop_cooldown = 0
+            self.season_swoop = False
         self.swoop_cooldown = max(0, self.swoop_cooldown - 1)
         if self.swoop_cooldown == 0 and dist <= 3 and dist > 1.5:
             self.swoop_cooldown = 4
@@ -681,12 +712,22 @@ class FunnelWebAI(HeuristicMonster):
 
 
 class QuokkaAI(HeuristicMonster):
-    """Friendly marsupial: approaches curiously, never attacks."""
+    """Friendly marsupial: approaches curiously, never attacks. After the
+    quokka bone club is forged, it flees on sight forever."""
     AGGRESSION = 0.0
     CAUTION = 0.8
     FLEE_HP = 0.5
     ENGAGE = 2
     ERRATIC = 0.5
+
+    def take_turn(self, target, fov_map, game_map, entities, noise_map=None):
+        inv = getattr(target, 'inventory', None)
+        if inv is not None and any(
+                getattr(i, 'item_choice', None) == 'quokka_bone_club'
+                for i in inv.items):
+            self.state = FLEE
+            self.last_seen = (target.x, target.y)
+        return super().take_turn(target, fov_map, game_map, entities, noise_map)
 
     def _should_attack(self, target, game_map, entities):
         return False  # never attacks
@@ -825,6 +866,30 @@ class RedbackAI(HeuristicMonster):
             results.append({'message': Message('The bite leaves no mark.', C.WHITE)})
             results.extend(self.owner.fighter.attack(target))
         return results
+
+
+class DisputeAI(HeuristicMonster):
+    """The Land Dispute: a cassowary and a kanga that have locked eyes
+    ignore the player and hunt EACH OTHER for the rest of the floor. When
+    the rival dies, the survivor's original species AI is restored."""
+    AGGRESSION = 1.3
+    CAUTION = 0.0
+    ENGAGE = 1
+
+    def __init__(self, rival, previous_ai):
+        super().__init__()
+        self.rival = rival
+        self.previous_ai = previous_ai
+
+    def take_turn(self, target, fov_map, game_map, entities, noise_map=None):
+        rival = self.rival
+        if not (rival.fighter and rival.fighter.hp > 0):
+            self.owner.ai = self.previous_ai
+            return [{'message': Message(
+                'The Land Dispute is settled. The survivor turns its '
+                'attention to you.', C.LIGHT_GRAY)}]
+        return HeuristicMonster.take_turn(self, rival, fov_map, game_map,
+                                          entities, noise_map)
 
 
 class StunnedMonster:

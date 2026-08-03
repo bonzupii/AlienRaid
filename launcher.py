@@ -23,8 +23,15 @@ from components.menus import main_menu, popup_box, action_at, set_mouse
 from loader_functions.initialize_new_game import get_constants, get_game_variables
 from loader_functions.data_loaders import load_game
 from renderer.renderer import Renderer
-from renderer.menu_background import generate_menu_background
+from renderer.menu_background import MenuBackdrop
+import functions.death_functions as death_mod
 from functions.game_loop import play_game
+
+# The old codes still work out here: Up Up Down Down Left Right Left
+# Right B A grants cosmetic sunglasses on the player sprite.
+KONAMI_SEQUENCE = [pygame.K_UP, pygame.K_UP, pygame.K_DOWN, pygame.K_DOWN,
+                   pygame.K_LEFT, pygame.K_RIGHT, pygame.K_LEFT,
+                   pygame.K_RIGHT, pygame.K_b, pygame.K_a]
 
 print("AlienRaid Copyright (C) 2019-2026  Bonzupii <bonzupii@protonmail.com>\n"
       "This program comes with ABSOLUTELY NO WARRANTY.\n"
@@ -40,22 +47,42 @@ def main():
     constants = get_constants()
 
     renderer = Renderer(constants)
-    bg = generate_menu_background(renderer.screen_w, renderer.screen_h)
+    backdrop = MenuBackdrop(renderer.screen_w, renderer.screen_h)
 
     show_main_menu = True
     show_load_error_message = False
+    outback_remembers = False
+    konami_buffer = []
+    konami_active = False
     clock = pygame.time.Clock()
 
     while True:
+        dt = clock.tick(30) / 1000.0
         if show_main_menu:
             frame_pos = renderer.screen_to_frame(pygame.mouse.get_pos())
             menus.set_mouse(frame_pos if frame_pos is not None else (0, 0))
 
+            events = pygame.event.get()
+            # Menu idle blink: any input keeps the face awake; untouched for
+            # ~3 minutes it blinks once, then the timer restarts.
+            backdrop.update(dt, events)
+
             action = {}
-            for event in pygame.event.get():
+            for event in events:
                 if event.type == pygame.QUIT:
                     return
                 elif event.type == pygame.KEYDOWN:
+                    # Konami code: the final B + A must not also fire the
+                    # menu's load/new-game actions, so the completing key
+                    # press is swallowed.
+                    if not konami_active:
+                        konami_buffer.append(event.key)
+                        if len(konami_buffer) > len(KONAMI_SEQUENCE):
+                            konami_buffer = konami_buffer[-len(KONAMI_SEQUENCE):]
+                        if konami_buffer == KONAMI_SEQUENCE:
+                            konami_active = True
+                            konami_buffer = []
+                            continue
                     candidate = handle_main_menu(event)
                     if candidate:
                         action = candidate
@@ -69,8 +96,10 @@ def main():
                 elif event.type == pygame.VIDEORESIZE:
                     renderer.resize(event.w, event.h)
 
-            main_menu(renderer.frame, renderer.font, bg,
-                      constants['screen_width'], constants['screen_height'])
+            main_menu(renderer.frame, renderer.font, backdrop.surface,
+                      constants['screen_width'], constants['screen_height'],
+                      remember_line='The Outback remembers you.' if outback_remembers else None,
+                      konami_footer='The old codes still work out here.' if konami_active else None)
 
             if show_load_error_message:
                 popup_box(renderer.frame, renderer.font, 'No saved game to load',
@@ -78,7 +107,6 @@ def main():
 
             renderer.present()
             pygame.display.flip()
-            clock.tick(30)
 
             new_game = action.get('new_game')
             load_saved_game = action.get('load_game')
@@ -88,6 +116,8 @@ def main():
                 show_load_error_message = False
             elif new_game:
                 player, entities, game_map, message_log, game_state = get_game_variables(constants)
+                if konami_active:
+                    player.sprite_id = 'player_sunglasses'
                 game_state = GameStates.PLAYERS_TURN
                 show_main_menu = False
             elif load_saved_game:
@@ -103,9 +133,15 @@ def main():
                                renderer, constants)
             if result == 'new_game':
                 player, entities, game_map, message_log, game_state = get_game_variables(constants)
+                if konami_active:
+                    player.sprite_id = 'player_sunglasses'
                 game_state = GameStates.PLAYERS_TURN
                 show_main_menu = False
             elif result == 'main_menu':
+                # The Outback remembers you: after any death, the menu
+                # footer changes for the rest of the session.
+                if death_mod.PLAYER_DIED_FLAG:
+                    outback_remembers = True
                 show_main_menu = True
             else:
                 return

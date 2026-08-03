@@ -8,8 +8,13 @@ from renderer import palette as C
 
 class Inventory:
     def __init__(self, capacity):
-        self.capacity = capacity
+        self.base_capacity = capacity
+        self.bonus_capacity = 0  # the Esky of Holding raises this
         self.items = []
+
+    @property
+    def capacity(self):
+        return self.base_capacity + self.bonus_capacity
 
     def add_item(self, item):
         results = []

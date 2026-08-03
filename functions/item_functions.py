@@ -84,10 +84,101 @@ def use_boomerang(entity, entities=None, fov_map=None, game_map=None, damage=120
     return results
 
 
+def use_dads_thong(entity, entities=None, fov_map=None, game_map=None,
+                   damage=140, maximum_range=8, noise_map=None):
+    """Dad's thong: a thrown single-plugger that always returns. One in
+    five throws lands a double-plugger critical."""
+    results = []
+    target = None
+    closest_distance = maximum_range + 1
+    for e in entities or []:
+        if e.fighter and e is not entity and _in_fov(fov_map, game_map, e.x, e.y):
+            distance = entity.distance_to(e)
+            if distance < closest_distance:
+                target = e
+                closest_distance = distance
+    if target:
+        crit = randint(1, 5) == 1
+        dmg = damage * 2 if crit else damage
+        results.append({'consumed': True, 'target': target,
+                        'message': Message(
+                            'You deploy the single-plugger. It claps the {0} '
+                            'across the ear for {1} damage, then flies back '
+                            'to your hand!'.format(target.name, dmg),
+                            C.LIGHT_ORANGE)})
+        if crit:
+            results.append({'message': Message(
+                'DOUBLE-PLUGGER CRITICAL!', C.YELLOW)})
+        results.extend(target.fighter.take_damage(dmg))
+    else:
+        results.append({'consumed': False, 'target': None,
+                        'message': Message('No enemy is within range for the thong.', C.RED)})
+    return results
+
+
+def use_meat_pie(entity, entities=None, fov_map=None, game_map=None, noise_map=None):
+    """The roadhouse meat pie: 50 scald damage, then +400 HP. Worth it."""
+    results = []
+    results.append({'message': Message(
+        'You bite into the meat pie. It scalds the roof of your mouth for 50 damage.',
+        C.ORANGE)})
+    results.extend(entity.fighter.take_damage(50))
+    entity.fighter.heal(400)
+    results.append({'message': Message('...Worth it. (+400 HP)', C.LIGHT_GREEN)})
+    results.append({'consumed': True})
+    return results
+
+
+def use_esky(entity, entities=None, fov_map=None, game_map=None, noise_map=None):
+    """Esky of Holding: permanently +2 inventory capacity. The tinnies
+    staying cold forever is flavour only -- the +2 is the joke's price."""
+    inv = entity.inventory
+    # getattr guard: pre-esky saves may lack the attribute entirely.
+    inv.bonus_capacity = getattr(inv, 'bonus_capacity', 0) + 2
+    return [{'consumed': True, 'message': Message(
+        'You stash the Esky of Holding in your pack. (inventory capacity +2 '
+        '-- and your tinnies are always cold.)', C.CYAN)}]
+
+
+def use_ned_kelly_chest(entity, entities=None, fov_map=None, game_map=None, noise_map=None):
+    """The memorial chest: pry it open for Ned Kelly's breastplate."""
+    results = []
+    level = getattr(game_map, 'dungeon_level', 1) if game_map else 1
+    from loader_functions.items import create_item  # deferred: breaks import cycle
+    breastplate = create_item('ned_kelly_breastplate', level, entity.x, entity.y)
+    added = entity.inventory.add_item(breastplate)
+    if not any(r.get('item_added') for r in added):
+        return [{'consumed': False, 'message': Message(
+            'You cannot carry the breastplate.', C.YELLOW)}]
+    results.append({'consumed': True, 'message': Message(
+        "You pry open the rusted chest. Ned Kelly's breastplate gleams inside.",
+        C.GOLD)})
+    results.append({'message': Message(
+        "You heft it. 'Too heavy to run from the law.'", C.LIGHT_GRAY)})
+    return results
+
+
 def use_didgeridoo(entity, entities=None, fov_map=None, game_map=None, turns=6, noise_map=None):
     results = []
     if noise_map:
         noise_map.emit(entity.x, entity.y, 8, 'didgeridoo')
+    # Play it inside a roadhouse and the Swaggie hums along, then hands
+    # over a free eucalyptus tea.
+    if entities:
+        swaggie = next((e for e in entities
+                        if getattr(e, 'npc_id', None) == 'swaggie'
+                        and entity.distance_to(e) <= 8), None)
+        # The tea is a one-per-roadhouse-visit favour (the didgeridoo is not
+        # consumed when nothing is stunned, so without this it would farm
+        # unlimited free heals).
+        if swaggie is not None and not getattr(swaggie, '_tea_given', False):
+            from loader_functions.items import create_item  # deferred: import cycle
+            tea = create_item('eucalyptus_tea', 1, entity.x, entity.y)
+            if any(r.get('item_added') for r in entity.inventory.add_item(tea)):
+                swaggie._tea_given = True
+                results.append({'message': Message(
+                    "The Swaggie hums along and hands you a free Eucalyptus "
+                    "Tea. ('Good drone. Reminds me of '04.')", C.LIGHT_GREEN)})
     stunned = 0
     for e in entities:
         if e.ai and e is not entity and _in_fov(fov_map, game_map, e.x, e.y):
@@ -196,10 +287,14 @@ def eat_taipan_meat(entity, amount=300, entities=None, fov_map=None, game_map=No
 
 
 def eat_dropbear_meat(entity, amount=400, entities=None, fov_map=None, game_map=None, noise_map=None):
-    """Dropbear meat: heal + brief invisibility, but it draws attention."""
+    """Dropbear meat: heal + brief invisibility, but it draws attention.
+    The scent is a REAL noise event: dropbears (HEARING 12) path toward
+    the player, fulfilling the flavour text mechanically."""
     results = []
     entity.fighter.heal(amount)
     entity.fighter.add_status('invisible', 15)
+    if noise_map:
+        noise_map.emit(entity.x, entity.y, 12, 'dropbear_scent')
     results.append({'consumed': True,
                     'message': Message('You eat the dropbear meat. You feel invisible... but something stirs.', C.GREEN)})
     results.append({'message': Message('A hungry Dropbear has caught your scent!', C.DARK_RED)})
@@ -207,10 +302,23 @@ def eat_dropbear_meat(entity, amount=400, entities=None, fov_map=None, game_map=
 
 
 def use_neuralyzer(entity, entities=None, fov_map=None, game_map=None, noise_map=None):
-    """MIB flash: wipe the memory of visible dingoes and scatter them."""
+    """MIB flash: wipe the memory of visible dingoes and scatter them.
+
+    Easter eggs: flashing the Agent J cameo is blocked (he's seen this bit
+    before), and flashing nothing flashes YOURSELF -- which resets the
+    rest timer (you forget why you were resting)."""
     results = []
+    entities = entities or []
+    cameo = any(e.sprite_id == 'agent_j_cameo'
+                and _in_fov(fov_map, game_map, e.x, e.y) for e in entities)
+    if cameo:
+        results.append({'consumed': False, 'message': Message(
+            "He shields his eyes. 'I've seen this bit before, mate.'",
+            C.LIGHT_VIOLET)})
+        return results
+
     dingo_found = False
-    for e in entities or []:
+    for e in entities:
         if e.ai and isinstance(e.ai, DingoAI) and _in_fov(fov_map, game_map, e.x, e.y):
             e.ai.last_seen = None
             e.ai.state = FLEE
@@ -223,10 +331,13 @@ def use_neuralyzer(entity, entities=None, fov_map=None, game_map=None, noise_map
                             'FLASH! Their eyes go blank. The dingoes forget you exist and scatter!',
                             C.CYAN)})
     else:
-        results.append({'consumed': False,
-                        'message': Message(
-                            'FLASH! High-frequency red light reflects uselessly. (Only affects Dingoes)',
-                            C.LIGHT_RED)})
+        results.append({'consumed': False, 'message': Message(
+            'FLASH! High-frequency red light reflects uselessly. Turns out '
+            'canine brains are uniquely susceptible to MIB tech. Or maybe '
+            'they just hate bright lights.', C.LIGHT_RED)})
+        results.append({'wait_timer_reset': True, 'message': Message(
+            'You flash yourself by accident. You forget why you were resting.',
+            C.LIGHT_VIOLET)})
     return results
 
 
@@ -236,14 +347,60 @@ def read_datalog(entity, text='', entities=None, fov_map=None, game_map=None, no
 
 
 def eat_vegemite(entity, amount=150, entities=None, fov_map=None, game_map=None, noise_map=None):
-    """Vegemite: heal + a one-time permanent +1 defense."""
+    """Vegemite: heal + a one-time permanent +1 defense. The first tin
+    rides in with a disclaimer (the creator's views are not the game's;
+    Marmite is objectively superior); the sixth tin walks it back. Eating
+    three rations grants the Acquired Taste: dropbears refuse to ambush
+    you (they respect the smell now) and the rest-timer dropbear never
+    triggers."""
     results = []
     entity.fighter.heal(amount)
+
+    # Track total lifetime vegemite consumption for the escalating bit below.
+    entity.vegemite_count = getattr(entity, 'vegemite_count', 0) + 1
+
     if entity.fighter.base_defense_bonus == 0:
         entity.fighter.base_defense_bonus = 1
-        results.append({'consumed': True,
-                        'message': Message('You eat the vegemite. (+1 permanent defense)', C.GREEN)})
+        results.append({
+            'consumed': True,
+            'message': Message('You eat the vegemite. (+1 permanent defense)', C.GREEN)
+        })
+
+        # --- EASTER EGG: the disclaimer rides in with the first tin. ---
+        results.append({
+            'message': Message(
+                "Disclaimer: The views expressed in this game do not reflect "
+                "those of the creator. Vegemite is included purely for "
+                "cultural authenticity; however, Marmite is objectively "
+                "superior.",
+                C.LIGHT_VIOLET)
+        })
+
     else:
-        results.append({'consumed': True,
-                        'message': Message('You eat the vegemite. (your defense is already hardened)', C.YELLOW)})
+        results.append({
+            'consumed': True,
+            'message': Message('You eat the vegemite. (your defense is already hardened)', C.YELLOW)
+        })
+
+    # --- EASTER EGG: walk it back on the 6th tin. ---
+    if entity.vegemite_count == 6:
+        results.append({
+            'message': Message(
+                "Disclaimer #2: Guys, chill. I'm American and I think both "
+                "Vegemite and Marmite on toast are lovely. I only slightly "
+                "intended to start an international incident with my "
+                "previous claim that Marmite is superior. Really I was just "
+                "curious to find out if Australia lied about having a "
+                "nuclear arsenal.",
+                C.LIGHT_VIOLET)
+        })
+
+    # Eating three rations grants the Acquired Taste: dropbears refuse to
+    # ambush you (they respect the smell now).
+    if entity.vegemite_count >= 3 and not getattr(entity.fighter, 'acquired_taste', False):
+        entity.fighter.acquired_taste = True
+        results.append({'message': Message(
+            'You have acquired a taste for Vegemite. Dropbears will respect '
+            'the smell now.', C.LIGHT_GREEN)})
+
     return results

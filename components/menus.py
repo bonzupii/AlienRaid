@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Pygame menus (no libtcod). All drawing is via the FontRenderer on the 12px
-UI grid (TILE = 12). The frame is no longer 55 font-rows tall, so centering
-is derived from the ACTUAL surface size, never from the screen_width /
-screen_height constants.
+Pygame menus (no libtcod). All drawing is via the FontRenderer (procedural
+Font16) on the 16px UI grid (TILE = 16).
 
-Phase B turned menu() into a Menu widget: every drawn menu registers
-per-option hit-rects (frame pixel coordinates) plus the action dict each
-option fires, so a MOUSEBUTTONDOWN is equivalent to the letter keys.
-Hover highlight via MOUSEMOTION (the launcher feeds the cursor position in
-frame px via set_mouse()).
+Every drawn menu registers per-option hit-rects (frame pixel coordinates)
+plus the action dict each option fires, so a MOUSEBUTTONDOWN is equivalent
+to the letter keys. Hover highlight via MOUSEMOTION (the launcher feeds the
+cursor position in frame px via set_mouse()).
+
+Tall menus (the examine popup) are SCROLLABLE: a ``scroll`` row offset plus
+a ``max_height`` viewport, with up/down indicators drawn while content is
+clipped. The launcher feeds wheel/arrow scroll offsets; the box itself is
+always clamped fully inside the frame.
 """
 import textwrap
 
@@ -19,7 +21,7 @@ import pygame
 from renderer import palette as C
 from components import crafting
 
-TILE = 12
+TILE = 16
 
 # ---------------------------------------------------------------------------
 # Global click/hover registry (frame-px coordinates)
@@ -102,7 +104,12 @@ def _wrap(header, width_tiles):
 
 class Menu:
     """A drawable, clickable menu. Options may be strings or
-    (text, color) tuples. ``actions`` parallels the options."""
+    (text, color) tuples. ``actions`` parallels the options.
+
+    With ``max_height`` the menu becomes a scrollable viewport: ``scroll``
+    rows are skipped off the top, up/down indicators are drawn while
+    content is clipped, and click-rects stay aligned to the visible window.
+    """
 
     def __init__(self, header, options, width, actions=None, option_colors=None):
         self.header = header
@@ -112,7 +119,8 @@ class Menu:
         self.option_colors = option_colors or [C.LIGHT_GRAY] * len(options)
         self.rects = []
 
-    def draw(self, surface, font, hover=-1, x=None, y=None):
+    def draw(self, surface, font, hover=-1, x=None, y=None,
+             scroll=0, max_height=None):
         sw, sh = _center(surface)
         wrapped = _wrap(self.header, self.width)
         # Wrap every option (with its (a)/ (b)/... key prefix) so the text
@@ -124,8 +132,11 @@ class Menu:
             option_lines.append(_wrap('({0}) {1}'.format(chr(letter_index), option),
                                       self.width))
             letter_index += 1
-        option_rows = sum(len(lines) for lines in option_lines)
-        height = len(wrapped) + option_rows + 2
+        content_rows = len(wrapped) + sum(len(lines) for lines in option_lines)
+        total = content_rows + 2  # +2 box padding rows
+        height = total
+        if max_height is not None:
+            height = max(3, min(total, max_height))
         if x is None:
             x = int(sw / 2 - self.width / 2)
         if y is None:
@@ -135,25 +146,57 @@ class Menu:
         x = max(1, min(x, max(1, sw - self.width - 1)))
         y = max(1, min(y, max(1, sh - height - 1)))
         _draw_box(surface, x, y, self.width, height)
-        ty = y + 1
+
+        viewport = height - 2                       # content rows visible
+        max_scroll = max(0, content_rows - viewport)
+        scroll = max(0, min(scroll, max_scroll))
+
+        # Build the flat content row list: (kind, opt_index, text, color, is_first)
+        rows = []
         for line in wrapped:
-            font.draw_text(surface, line, x + 1, ty, C.WHITE)
-            ty += 1
-        self.rects = []
+            rows.append((0, None, line, C.WHITE, False))
         letter_index = ord('a')
         for i, lines in enumerate(option_lines):
             color = self.option_colors[i] if i < len(self.option_colors) else C.LIGHT_GRAY
-            block_top = ty
-            for j, line in enumerate(lines):
-                if i == hover and j == 0:
-                    font.draw_text(surface, '>', x + 1, ty, C.YELLOW)
-                line_color = C.WHITE if i == hover else color
-                font.draw_text(surface, line, x + 3, ty, line_color)
-                ty += 1
-            self.rects.append(pygame.Rect((x + 1) * TILE, block_top * TILE,
-                                          (self.width - 2) * TILE,
-                                          len(lines) * TILE))
+            first = True
+            for line in lines:
+                rows.append((1, i, line, color, first))
+                first = False
             letter_index += 1
+
+        # Option block row ranges (content space) for click-rect alignment.
+        block_ranges = []
+        cursor = len(wrapped)
+        for lines in option_lines:
+            block_ranges.append((cursor, cursor + len(lines)))
+            cursor += len(lines)
+
+        if scroll > 0:
+            font.draw_text(surface, '▲', x + 1, y + 1, C.YELLOW)
+        if scroll + viewport < content_rows:
+            font.draw_text(surface, '▼', x + 1, y + height - 2, C.YELLOW)
+
+        self.rects = []
+        for row_idx, (kind, opt_idx, text, color, is_first) in enumerate(rows):
+            if row_idx < scroll or row_idx >= scroll + viewport:
+                continue
+            ty = y + 1 + (row_idx - scroll)
+            if kind == 0:
+                font.draw_text(surface, text, x + 1, ty, color)
+            else:
+                if is_first and opt_idx == hover:
+                    font.draw_text(surface, '>', x + 1, ty, C.YELLOW)
+                line_color = C.WHITE if opt_idx == hover else color
+                font.draw_text(surface, text, x + 3, ty, line_color)
+
+        for i, (start, end) in enumerate(block_ranges):
+            vis_start = max(start, scroll)
+            vis_end = min(end, scroll + viewport)
+            if vis_start < vis_end:
+                rect_y = y + 1 + (vis_start - scroll)
+                self.rects.append(pygame.Rect(
+                    (x + 1) * TILE, rect_y * TILE,
+                    (self.width - 2) * TILE, (vis_end - vis_start) * TILE))
         _register(self.rects, self.actions)
         return (x, y, self.width, height)
 
@@ -253,12 +296,14 @@ def dialogue_menu(surface, font, header, options, screen_width, screen_height):
     Menu(header, options, 62, actions=actions).draw(surface, font, hover=hover_index())
 
 
-def popup_box(surface, font, text, screen_width, screen_height):
+def popup_box(surface, font, text, screen_width, screen_height, scroll=0):
     m = Menu(text, ['close'], 50, actions=[{'exit': True}])
-    m.draw(surface, font, hover=hover_index())
+    m.draw(surface, font, hover=hover_index(), scroll=scroll,
+           max_height=screen_height - 8)
 
 
-def main_menu(surface, font, background_image, screen_width, screen_height):
+def main_menu(surface, font, background_image, screen_width, screen_height,
+              remember_line=None, konami_footer=None):
     if background_image is not None:
         scaled = pygame.transform.smoothscale(background_image,
                                               (surface.get_width(), surface.get_height()))
@@ -274,6 +319,12 @@ def main_menu(surface, font, background_image, screen_width, screen_height):
                    sh - 2, C.LIGHT_GRAY)
     font.draw_text(surface, help_line, _centered_x(surface, help_line),
                    sh - 4, C.LIGHT_GRAY)
+    if remember_line:
+        font.draw_text(surface, remember_line, _centered_x(surface, remember_line),
+                       sh - 7, C.LIGHT_RED)
+    if konami_footer:
+        font.draw_text(surface, konami_footer, _centered_x(surface, konami_footer),
+                       sh - 9, C.LIGHT_VIOLET)
     menu(surface, font, '', ['Play a new game', 'Continue last game', 'Quit'],
          24, screen_width, screen_height,
          actions=[{'new_game': True}, {'load_game': True}, {'exit': True}])
@@ -360,6 +411,9 @@ def victory_screen(surface, font, player, game_map, screen_width, screen_height)
         epilogue = player.reputation.epilogue()
     for i, line in enumerate(EPILOGUES[epilogue]):
         font.draw_text(surface, line, x + 2, y + 9 + i, C.LIGHT_VIOLET)
+    if player.reputation is not None and getattr(player.reputation, 'adf', 0) <= -15:
+        font.draw_text(surface, 'A file with your name lands on an ADF colonel\'s desk.',
+                       x + 2, y + 9 + len(EPILOGUES[epilogue]), C.LIGHT_RED)
     rects = []
     actions = [{'new_game': True}, {'exit': True}]
     for i, label in enumerate(('(a) fly again', '(b) main menu')):

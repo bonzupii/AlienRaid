@@ -16,9 +16,10 @@ from random import randint
 
 import pygame
 
+import functions.death_functions as death_mod
 from functions.death_functions import kill_monster, kill_player
 from functions.senses import NoiseMap
-from components.ai import HeuristicMonster, HUNT, FLEE
+from components.ai import HeuristicMonster, HUNT, FLEE, DisputeAI
 from components.entity import get_blocking_entities_at_location
 from algorithms.fov import compute_fov
 from components.game_messages import Message
@@ -56,9 +57,13 @@ def _handle_take(player, entities, game_map, message_log, constants):
     """Trail (up/down) or the ship (install parts / escape)."""
     for entity in entities:
         if entity.trail and entity.x == player.x and entity.y == player.y:
+            # Use the trail's own target floor so the mystery trail can
+            # dive to the 4.5 pocket (and its exit trail returns to 5).
             if entity.trail.direction == 'down':
-                return game_map.go_down(player, message_log, constants)
-            return game_map.go_up(player, message_log, constants)
+                return game_map.go_down(player, message_log, constants,
+                                        floor=entity.trail.floor)
+            return game_map.go_up(player, message_log, constants,
+                                  floor=entity.trail.floor)
         elif entity.ship and entity.x == player.x and entity.y == player.y:
             if player.quest.found_count == 0:
                 message_log.add_message(Message(
@@ -98,6 +103,77 @@ def _apply_level_up(player, level_up):
         player.fighter.base_defense += 12
 
 
+def _quokka_encounter(player, quokka, message_log):
+    """Bump a quokka: once per game it poses for a selfie (+XP). If the
+    quokka bone club exists (the quokkas remember), it flees instead."""
+    has_club = any(getattr(i, 'item_choice', None) == 'quokka_bone_club'
+                   for i in player.inventory.items)
+    if has_club:
+        quokka.ai.state = FLEE
+        quokka.ai.state_turns = 0
+        message_log.add_message(Message(
+            'The quokka flees on sight. It remembers what you did to its cousin.',
+            C.LIGHT_GRAY))
+        return []
+    if not getattr(player, '_quokka_selfie', False):
+        player._quokka_selfie = True
+        return [{'xp': 200, 'message': Message(
+            'The quokka poses for the selfie. The smile is eternal. (+200 XP)',
+            C.LIGHT_GREEN)}]
+    message_log.add_message(Message(
+        'The quokka smiles. It has no phone. It never needed one.', C.LIGHT_GRAY))
+    return []
+
+
+def _maybe_land_dispute(game_map, entities, fov_map, message_log):
+    """Once per floor: if a cassowary and a kanga are ever adjacent and
+    both in FOV, they lock eyes and hunt each other for the rest of the
+    floor, ignoring the player."""
+    kanga = cassowary = None
+    for e in entities:
+        if not e.fighter:
+            continue
+        species = getattr(e, 'species', None)
+        if species == 'kanga':
+            kanga = e
+        elif species == 'cassowary':
+            cassowary = e
+        if kanga is not None and cassowary is not None:
+            break
+    if kanga is None or cassowary is None:
+        return
+    if max(abs(kanga.x - cassowary.x), abs(kanga.y - cassowary.y)) > 1:
+        return
+    # Both must be in the player's field of view to lock eyes.
+    if fov_map[cassowary.y * game_map.width + cassowary.x] == 0:
+        return
+    if fov_map[kanga.y * game_map.width + kanga.x] == 0:
+        return
+    game_map.land_dispute = True
+    kanga.ai = DisputeAI(cassowary, kanga.ai)
+    kanga.ai.owner = kanga
+    cassowary.ai = DisputeAI(kanga, cassowary.ai)
+    cassowary.ai.owner = cassowary
+    message_log.add_message(Message(
+        'The Cassowary and the Kanga lock eyes. Somewhere, the Land '
+        'Dispute begins.', C.LIGHT_ORANGE))
+
+
+def _maybe_swooping(game_map, entities, message_log):
+    """Once per floor: every magpie swoops simultaneously, then resumes
+    normal behaviour. It is spring."""
+    magpies = [e for e in entities
+               if getattr(e, 'ai', None) and getattr(e, 'species', None) == 'magpie']
+    if not magpies:
+        return
+    game_map.swooping = True
+    for m in magpies:
+        m.ai.season_swoop = True
+    message_log.add_message(Message(
+        'It is spring. This is simply a friendly reminder to wear a helmet.',
+        C.LIGHT_GRAY))
+
+
 def _cameo_fan_mail(player, entities, tile, message_log):
     """One-off fan mail the first time the player inspects the Agent J
     cameo (right-click examine). Only fires once per run."""
@@ -115,6 +191,7 @@ def _cameo_fan_mail(player, entities, tile, message_log):
 
 def play_game(player, entities, game_map, message_log, game_state, renderer, constants):
     """Main game loop. Returns 'new_game', 'main_menu', or None (quit)."""
+    death_mod.PLAYER_DIED_FLAG = False
     fov_recompute = True
     fov_map = _recompute_fov(game_map, player, constants)
 
@@ -126,6 +203,7 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
     active_npc = None
     dialogue_data = None
     popup_text = None
+    popup_scroll = 0
     wait_timer = 0
     mouse_tile = None
     noise_map = NoiseMap(game_map.width, game_map.height)
@@ -159,7 +237,10 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
                     menu_action = action_at(frame)
                     if menu_action:
                         action.update(menu_action)
-                if event.button in (1, 3):
+                if event.button in (4, 5) and game_state == GameStates.POPUP:
+                    # Mouse wheel scrolls tall examine popups.
+                    action['popup_scroll'] = -1 if event.button == 4 else 1
+                elif event.button in (1, 3):
                     candidate = handle_mouse(event, tile)
                     if candidate:
                         mouse_action = candidate
@@ -190,7 +271,8 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
 
         renderer.render(game_map, fov_map, entities, player, message_log,
                         game_state, mouse_tile, dialogue=render_dialogue,
-                        popup=popup_text, context_index=context_index)
+                        popup=popup_text, context_index=context_index,
+                        popup_scroll=popup_scroll)
         pygame.display.flip()
         clock.tick(30)
 
@@ -215,6 +297,7 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
         context_equip = action.get('context_equip')
         context_drop = action.get('context_drop')
         crafting = action.get('crafting')
+        popup_scroll_action = action.get('popup_scroll')
         take_trail = action.get('take_trail')
         level_up = action.get('level_up')
         show_character_screen = action.get('show_character_screen')
@@ -224,6 +307,7 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
         new_game = action.get('new_game')
 
         player_turn_results = []
+        did_wait = False  # per-turn: only the wait action keeps the rest timer
 
         # ------------------------------------------------------- map clicks
         if left_click and game_state == GameStates.PLAYERS_TURN:
@@ -235,7 +319,11 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
                     previous_game_state = game_state
                     game_state = GameStates.DIALOGUE
                 elif target.fighter:
-                    player_turn_results.extend(player.fighter.attack(target))
+                    if getattr(target, 'species', None) == 'quokka':
+                        player_turn_results.extend(
+                            _quokka_encounter(player, target, message_log))
+                    else:
+                        player_turn_results.extend(player.fighter.attack(target))
                     game_state = GameStates.ENEMY_TURN
             elif target is None:
                 player.move_towards(tx, ty, game_map, entities)
@@ -247,11 +335,39 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
             names = get_names_under_mouse(right_click, entities, fov_map, game_map)
             if names:
                 popup_text = names
+                popup_scroll = 0
                 previous_game_state = game_state
                 game_state = GameStates.POPUP
                 # Fan mail only fires when the cameo is actually examined
                 # (visible and under the cursor), and only once per run.
                 _cameo_fan_mail(player, entities, right_click, message_log)
+                at_tile = [e for e in entities
+                           if e.x == right_click[0] and e.y == right_click[1]]
+                # Ship examination: the third right-click reveals the
+                # nameplate, the fifth that it is pending.
+                if any(e.ship for e in at_tile):
+                    examines = getattr(player, '_ship_examines', 0) + 1
+                    player._ship_examines = examines
+                    if examines in (3, 5):
+                        if examines == 3:
+                            line = 'The nameplate reads: "CSS Fair Use."'
+                        else:
+                            line = 'The nameplate reads: "CSS Fair Use (pending)."'
+                        popup_text = names + '\n\n' + line
+                        message_log.add_message(Message(line, C.LIGHT_GRAY))
+                # AECD checkpoint radio.
+                if any(getattr(e, 'npc_id', None) == 'aecd' for e in at_tile) \
+                        and not getattr(player, '_heard_radio', False):
+                    player._heard_radio = True
+                    message_log.add_message(Message(
+                        "The checkpoint radio is playing 'High Voltage'. "
+                        "The officer insists the band is called AECD.",
+                        C.LIGHT_GRAY))
+                # The rusty ute.
+                if any(e.sprite_id == 'ute' for e in at_tile):
+                    message_log.add_message(Message(
+                        'A rusted ute. The tray is full of warm tinnies.',
+                        C.LIGHT_GRAY))
 
         # -------------------------------------------------- menu states
         if game_state == GameStates.SHOW_INVENTORY:
@@ -313,9 +429,12 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
                 context_item = None
 
         elif game_state == GameStates.POPUP:
+            if popup_scroll_action:
+                popup_scroll = max(0, min(999, popup_scroll + popup_scroll_action))
             if exit_game:
                 game_state = previous_game_state
                 popup_text = None
+                popup_scroll = 0
 
         elif game_state in (GameStates.VICTORY, GameStates.PLAYER_DEAD):
             if new_game:
@@ -333,10 +452,6 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
                 destination_x = player.x + dx
                 destination_y = player.y + dy
 
-                if wait_timer > 0:
-                    if randint(0, 7) == 7:
-                        wait_timer -= 5
-
                 passive_regen(player, message_log)
 
                 if not game_map.is_blocked(destination_x, destination_y):
@@ -348,7 +463,11 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
                             previous_game_state = game_state
                             game_state = GameStates.DIALOGUE
                         elif target.fighter:
-                            player_turn_results.extend(player.fighter.attack(target))
+                            if getattr(target, 'species', None) == 'quokka':
+                                player_turn_results.extend(
+                                    _quokka_encounter(player, target, message_log))
+                            else:
+                                player_turn_results.extend(player.fighter.attack(target))
                             game_state = GameStates.ENEMY_TURN
                     else:
                         player.move(dx, dy)
@@ -357,15 +476,28 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
                         game_state = GameStates.ENEMY_TURN
 
         elif wait and game_state == GameStates.PLAYERS_TURN:
+            did_wait = True
             wait_timer, game_state = wait_action(player, message_log, wait_timer)
 
         elif pickup and game_state == GameStates.PLAYERS_TURN:
+            picked = None
             for entity in entities:
                 if entity.item and entity.x == player.x and entity.y == player.y:
                     player_turn_results.extend(player.inventory.add_item(entity))
+                    picked = entity
                     break
-            else:
+            if picked is None:
                 message_log.add_message(Message('There is nothing here to pick up.', C.YELLOW))
+            # 1-in-50 grabs: the rusty ute starts first try and drives off
+            # with the rest of the tinnies.
+            elif getattr(picked, 'item_choice', None) == 'tinny' and randint(1, 50) == 1:
+                for e in list(entities):
+                    if (getattr(e, 'item_choice', None) == 'tinny' and e is not picked) \
+                            or e.sprite_id == 'ute':
+                        entities.remove(e)
+                message_log.add_message(Message(
+                    'The rusty ute coughs, roars to life and drives off '
+                    'with the rest of the tinnies!', C.ORANGE))
 
         if show_inventory and game_state == GameStates.PLAYERS_TURN:
             previous_game_state = game_state
@@ -419,6 +551,7 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
                 active_npc = None
                 dialogue_data = None
                 popup_text = None
+                popup_scroll = 0
             elif game_state == GameStates.TARGETING:
                 player_turn_results.append({'targeting_cancelled': True})
             elif game_state in (GameStates.VICTORY, GameStates.PLAYER_DEAD):
@@ -430,12 +563,22 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
         if fullscreen:
             renderer.toggle_fullscreen()
 
-        game_state, targeting_item = process_player_turn_results(
+        game_state, targeting_item, wait_timer = process_player_turn_results(
             player_turn_results, player, entities, game_map, message_log,
-            game_state, previous_game_state)
+            game_state, previous_game_state, wait_timer=wait_timer)
 
         # ------------------------------------------------------- enemy turn
         if game_state == GameStates.ENEMY_TURN:
+            # Non-rest actions bleed the rest timer down slowly (2 per
+            # action) so a few waits can't be wiped out in one move, but
+            # honest play clears it. Waiting itself never decays it.
+            if not did_wait and wait_timer > 0:
+                wait_timer = max(0, wait_timer - 2)
+            # Per-floor easter-egg triggers (each fires once per floor).
+            if not getattr(game_map, 'land_dispute', False):
+                _maybe_land_dispute(game_map, entities, fov_map, message_log)
+            if not getattr(game_map, 'swooping', False):
+                _maybe_swooping(game_map, entities, message_log)
             expired = player.fighter.tick_statuses()
             for status in expired:
                 if status == 'speed':
@@ -497,9 +640,9 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
                                 # Capture name/AI before kill_monster nuls them.
                                 dead_name = dead_entity.name
                                 dead_ai = dead_entity.ai
-                                message, dropped = kill_monster(
+                                message, dropped_items = kill_monster(
                                     dead_entity, game_map.dungeon_level)
-                                if dropped:
+                                for dropped in dropped_items:
                                     entities.append(dropped)
                                     message_log.add_message(Message(
                                         'The {0} dropped a {1}!'.format(
