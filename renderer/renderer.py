@@ -62,6 +62,8 @@ class Renderer:
         self._dark_floor = None
         self._light_wall = None
         self._light_floor = None
+        self._dark_brush = None
+        self._light_brush = None
         self._cached_level = None
         self.fullscreen = False
         self._scale = 1.0
@@ -106,6 +108,8 @@ class Renderer:
         self._dark_floor = self._make_floor_tile(colors['dark_ground'])
         self._light_wall = self._make_wall_tile(colors['light_wall'])
         self._light_floor = self._make_floor_tile(colors['light_ground'])
+        self._dark_brush = self._make_floor_tile(colors['dark_brush'])
+        self._light_brush = self._make_floor_tile(colors['light_brush'])
         self._cached_level = game_map.dungeon_level
         width, height = game_map.width, game_map.height
         for y in range(height):
@@ -115,7 +119,12 @@ class Renderer:
                     self._stamp_dark(game_map, x, y)
 
     def _stamp_dark(self, game_map, x, y):
-        tile = self._dark_wall if game_map.is_wall(x, y) else self._dark_floor
+        if game_map.is_brush(x, y):
+            tile = self._dark_brush
+        elif game_map.is_wall(x, y):
+            tile = self._dark_wall
+        else:
+            tile = self._dark_floor
         self.terrain_cache.blit(tile, (x * TILE, y * TILE))
 
     def _sync_level(self, game_map):
@@ -177,7 +186,12 @@ class Renderer:
                     if not game_map.explored[base + x]:
                         game_map.explored[base + x] = 1
                         self._stamp_dark(game_map, x, y)
-                    light = self._light_wall if game_map.is_wall(x, y) else self._light_floor
+                    if game_map.is_brush(x, y):
+                        light = self._light_brush
+                    elif game_map.is_wall(x, y):
+                        light = self._light_wall
+                    else:
+                        light = self._light_floor
                     map_surf.blit(light, (x * TILE, y * TILE))
 
         model = build_render_model(entities, fov, game_map)

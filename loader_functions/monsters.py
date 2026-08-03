@@ -7,7 +7,9 @@ from random import randint
 from components.ai import (KangaAI, JoeyAI, WallabyAI, WallarooAI, TreeKangaAI,
                            DingoAI, GoannaAI, KillerBeeAI, DropbearAI, TaipanAI,
                            EmuAI, WombatAI, MagpieAI, CassowaryAI, CrocodileAI,
-                           EchidnaAI, FunnelWebAI)
+                           EchidnaAI, FunnelWebAI, QuokkaAI, ThornyDevilAI,
+                           BlueTongueAI, WedgeTailedEagleAI, FeralCamelAI,
+                           PythonAI, RedbackAI)
 from components.entity import Entity
 from components.fighter import Fighter
 from functions.render_order import RenderOrder
@@ -32,6 +34,13 @@ MONSTER_TABLES = {
     'magpie':      [[0, 5], [25, 8], [35, 11], [25, 15]],
     'cassowary':   [[0, 11], [15, 14], [25, 17], [30, 19]],
     'crocodile':   [[0, 14], [15, 17], [25, 20]],
+    'quokka':      [[0, 2], [15, 5], [20, 8], [15, 12]],
+    'thorny_devil':   [[0, 6], [20, 9], [25, 13], [20, 17]],
+    'blue_tongue':    [[0, 4], [15, 7], [20, 11], [15, 15]],
+    'wedge_tailed_eagle': [[0, 8], [10, 11], [15, 15], [10, 19]],
+    'feral_camel':    [[0, 10], [10, 13], [15, 16], [10, 19]],
+    'python':         [[0, 12], [15, 15], [20, 18]],
+    'redback':        [[0, 3], [20, 6], [30, 10], [25, 14], [20, 18]],
 }
 
 # stat multipliers. statbase = randint(min, max) + min(level, 15)
@@ -53,6 +62,13 @@ TEMPLATES = {
     'magpie':      {'hp': 10, 'power': 2.8, 'def': 1.0, 'xp': 2.8, 'min': 10, 'max': 18, 'color': (20, 20, 20)},
     'cassowary':   {'hp': 17, 'power': 3.8, 'def': 1.5, 'xp': 5.0, 'min': 26, 'max': 38, 'color': (40, 60, 120)},
     'crocodile':   {'hp': 20, 'power': 3.6, 'def': 1.8, 'xp': 5.0, 'min': 30, 'max': 44, 'color': (30, 80, 40)},
+    'quokka':      {'hp': 8, 'power': 1.5, 'def': 0.8, 'xp': 2.0, 'min': 10, 'max': 18, 'color': (180, 140, 100)},
+    'thorny_devil':    {'hp': 12, 'power': 2.2, 'def': 2.5, 'xp': 3.0, 'thorns': 0.8, 'min': 16, 'max': 28, 'color': (160, 120, 80)},
+    'blue_tongue':     {'hp': 11, 'power': 2.0, 'def': 1.2, 'xp': 2.8, 'min': 14, 'max': 24, 'color': (100, 80, 60)},
+    'wedge_tailed_eagle': {'hp': 14, 'power': 3.5, 'def': 1.3, 'xp': 4.0, 'min': 20, 'max': 32, 'color': (80, 60, 40)},
+    'feral_camel':     {'hp': 25, 'power': 2.8, 'def': 2.0, 'xp': 4.5, 'min': 30, 'max': 45, 'color': (200, 180, 140)},
+    'python':          {'hp': 18, 'power': 3.2, 'def': 1.5, 'xp': 4.2, 'min': 24, 'max': 38, 'color': (100, 80, 50)},
+    'redback':         {'hp': 6, 'power': 8.0, 'def': 0.7, 'xp': 2.5, 'min': 8, 'max': 14, 'color': (40, 20, 20)},
 }
 
 AI_CLASSES = {
@@ -61,6 +77,9 @@ AI_CLASSES = {
     'goanna': GoannaAI, 'killer_bee': KillerBeeAI,    'dropbear': DropbearAI, 'echidna': EchidnaAI, 'taipan': TaipanAI,
     'emu': EmuAI, 'funnel_web': FunnelWebAI, 'wombat': WombatAI,
     'magpie': MagpieAI, 'cassowary': CassowaryAI, 'crocodile': CrocodileAI,
+    'quokka': QuokkaAI, 'thorny_devil': ThornyDevilAI,
+    'blue_tongue': BlueTongueAI, 'wedge_tailed_eagle': WedgeTailedEagleAI,
+    'feral_camel': FeralCamelAI, 'python': PythonAI, 'redback': RedbackAI,
 }
 
 DISPLAY_NAMES = {
@@ -69,6 +88,9 @@ DISPLAY_NAMES = {
     'goanna': 'Goanna', 'killer_bee': 'Killer Bee',    'dropbear': 'Dropbear', 'echidna': 'Echidna', 'taipan': 'Taipan',
     'emu': 'Emu', 'funnel_web': 'Funnel-web Spider', 'wombat': 'Wombat',
     'magpie': 'Magpie', 'cassowary': 'Cassowary', 'crocodile': 'Crocodile',
+    'quokka': 'Quokka', 'thorny_devil': 'Thorny Devil',
+    'blue_tongue': 'Blue-tongue Lizard', 'wedge_tailed_eagle': 'Wedge-tailed Eagle',
+    'feral_camel': 'Feral Camel', 'python': 'Python', 'redback': 'Redback Spider',
 }
 
 

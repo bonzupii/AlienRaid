@@ -23,6 +23,40 @@ from renderer import palette as C
 # 8-neighbour offsets used for cover/escape-route counting.
 _NEIGHBOURS = ((-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1))
 
+# State-machine labels (graze / alert / hunt / flee).
+GRAZE = 'graze'
+ALERT = 'alert'
+HUNT = 'hunt'
+FLEE = 'flee'
+
+
+class _PhantomFighter:
+    """Inert fighter for _PhantomTarget: the AI's scoring/attack code can
+    run against a remembered position without crashing or dealing damage."""
+
+    hp = 1
+    max_hp = 1
+    power = 0
+    defense = 0
+
+    def take_damage(self, amount, attacker=None):
+        return []
+
+    def attack(self, target):
+        return []
+
+
+class _PhantomTarget:
+    """Stand-in for a position a monster is chasing (a remembered spot or
+    a noise source) so the normal distance / pathfinding logic can be
+    reused without a real target entity."""
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.name = 'the last place'
+        self.fighter = _PhantomFighter()
+
 
 def _in_fov(fov_map, game_map, x, y):
     if not (0 <= x < game_map.width and 0 <= y < game_map.height):
@@ -66,21 +100,46 @@ class HeuristicMonster:
     ENGAGE = 1         # preferred engagement distance (tiles)
     FAST = 1           # tiles moved per turn (emu = 2)
     SLOW = 1           # acts once every SLOW turns (wombat / croc = 2)
+    HEARING = 0        # radius at which the monster hears noise events
+    SMELL = 0          # radius at which the monster smells the target
+    STATE = GRAZE      # starting state-machine state
 
     def __init__(self):
         self.slow_tick = 0   # incremented each turn; act when % SLOW == 0
         self.retreat = 0     # bee: retreat turns after attacking
+        self.last_seen = None  # (x, y) of the last known target position
+        self.state = self.STATE
+        self.state_turns = 0
 
     # ------------------------------------------------------------------ public
-    def take_turn(self, target, fov_map, game_map, entities):
+    def take_turn(self, target, fov_map, game_map, entities, noise_map=None):
         results = []
         monster = self.owner
 
         if not (target.fighter and target.fighter.hp > 0):
             return results
-        # Dormant until seen (classic roguelike behaviour).
-        if not _in_fov(fov_map, game_map, monster.x, monster.y):
+
+        in_fov = _in_fov(fov_map, game_map, monster.x, monster.y)
+        if in_fov:
+            self.last_seen = (target.x, target.y)
+        elif self.SMELL and monster.distance_to(target) <= self.SMELL:
+            # Scent-trackers (dingoes) shadow the player without sight.
+            self.last_seen = (target.x, target.y)
+            in_fov = True
+
+        # Dormant until seen / smelled / heard (classic roguelike behaviour).
+        if not in_fov and self.last_seen is None:
+            if noise_map and self.HEARING > 0:
+                noise = noise_map.get_noise_at(monster.x, monster.y)
+                if noise > 0:
+                    strongest = noise_map.find_strongest_noise()
+                    if strongest:
+                        noise_x, noise_y, _ = strongest
+                        phantom = _PhantomTarget(noise_x, noise_y)
+                        if monster.distance_to(phantom) > 1:
+                            monster.move_astar(phantom, entities, game_map)
             return results
+
         # Hit-and-run species count down their retreat turns.
         self.retreat = max(0, self.retreat - 1)
         # Slow species act only every SLOW turns.
@@ -90,16 +149,29 @@ class HeuristicMonster:
 
         dist = monster.distance_to(target)
 
+        # State machine (graze / alert / hunt / flee).
+        self._update_state(target, fov_map, game_map, dist)
+        self.state_turns += 1
+
+        # Out of sight: chase the last known position instead of the player.
+        effective_target = target
+        if not in_fov and self.last_seen:
+            effective_target = _PhantomTarget(self.last_seen[0], self.last_seen[1])
+            if monster.distance_to(effective_target) < 2:
+                self.last_seen = None
+        dist = monster.distance_to(effective_target)
+
         # 1) Special ability phase (pounce / spit / swoop / howl...).
-        results.extend(self._special_turn(target, fov_map, game_map, entities, dist))
+        results.extend(self._special_turn(effective_target, fov_map, game_map, entities, dist))
         if target.fighter.hp <= 0:
             return results
-        dist = monster.distance_to(target)
+        dist = monster.distance_to(effective_target)
 
-        # 2) Melee when adjacent (and the heuristic wants to fight).
+        # 2) Melee when adjacent (and the heuristic wants to fight). Only
+        # ever strike the real target — a phantom is just a spot to search.
         if dist < 2:
-            if self._should_attack(target, game_map, entities):
-                results.extend(self._attack(target))
+            if effective_target is target and self._should_attack(effective_target, game_map, entities):
+                results.extend(self._attack(effective_target))
                 self._after_attack()
             return results
 
@@ -108,7 +180,7 @@ class HeuristicMonster:
             return results
 
         # 4) Pick the best step (or wait) by scoring candidate tiles.
-        dx, dy = self._pick_step(target, game_map, entities, dist)
+        dx, dy = self._pick_step(effective_target, game_map, entities, dist)
         if dx == 0 and dy == 0:
             return results
         for _ in range(max(1, self.FAST)):
@@ -116,13 +188,18 @@ class HeuristicMonster:
             if game_map.is_blocked(nx, ny) or self._blocked_by(entities, nx, ny):
                 break
             monster.move(dx, dy)
-            if monster.distance_to(target) < 2:
+            if monster.distance_to(effective_target) < 2:
                 break
         return results
 
     # ------------------------------------------------------------ to override
     def _special_turn(self, target, fov_map, game_map, entities, dist):
         return []
+
+    def _update_state(self, target, fov_map, game_map, dist):
+        """State-machine hook; species override this to define their own
+        graze/alert/hunt/flee transitions."""
+        pass
 
     def _attack(self, target):
         return self.owner.fighter.attack(target)
@@ -158,6 +235,8 @@ class HeuristicMonster:
 
     def _should_attack(self, target, game_map, entities):
         monster = self.owner
+        if self.state == FLEE:
+            return False
         if self._hp_ratio() <= self.FLEE_HP:
             return False
         if self.PACK:
@@ -183,7 +262,11 @@ class HeuristicMonster:
                 continue
             if self._blocked_by(entities, nx, ny):
                 continue
-            score = self._score_tile(target, game_map, nx, ny, dist, entities)
+            if self.state == FLEE:
+                # Run away: score tiles by distance from the target.
+                score = math.hypot(target.x - nx, target.y - ny)
+            else:
+                score = self._score_tile(target, game_map, nx, ny, dist, entities)
             if score > best_score:
                 best_score = score
                 best = (dx, dy)
@@ -233,30 +316,48 @@ class HeuristicMonster:
 # ---------------------------------------------------------------------------
 
 class KangaAI(HeuristicMonster):
-    """Territorial bruiser: charges in, never retreats, winds up kicks."""
+    """Territorial bruiser: grazes until provoked, charges in, never
+    retreats, winds up telegraphed kicks."""
     AGGRESSION = 1.4
     CAUTION = 0.1
     ERRATIC = 0.3
     FLEE_HP = 0.0
     ENGAGE = 1
+    STATE = GRAZE
 
     def __init__(self):
         super().__init__()
         self.charge = 0
 
+    def _update_state(self, target, fov_map, game_map, dist):
+        # Grazing until the player comes close, then it commits.
+        if self.state == GRAZE and dist <= 3:
+            self.state = HUNT
+            self.state_turns = 0
+
+    def _should_attack(self, target, game_map, entities):
+        if self.state != HUNT:
+            return False
+        return super()._should_attack(target, game_map, entities)
+
     def _attack(self, target):
         results = []
-        self.charge += 1
-        if self.charge >= 2:
+        if self.charge == 1:
+            # Second contact after the wind-up: the real kick lands.
+            self.charge = 0
+            self.owner.sprite_id = 'kanga'
             bonus = int(self.owner.fighter.power * 0.5)
             results.append({'message': Message('The Kanga winds up a mighty kick!', C.LIGHT_ORANGE)})
             damage = self.owner.fighter.power + bonus - target.fighter.defense
             if damage > 0:
                 results.append({'message': Message('The Kanga kicks {0} for {1} hit points!'.format(target.name, damage), C.WHITE)})
                 results.extend(target.fighter.take_damage(damage, attacker=self.owner))
-            self.charge = 0
-        else:
-            results.extend(self.owner.fighter.attack(target))
+            return results
+        # First contact: rear up and telegraph the kick for the next hit.
+        self.charge = 1
+        self.owner.sprite_id = 'kanga_rear'
+        results.extend(self.owner.fighter.attack(target))
+        results.append({'message': Message('The Kanga rears up, telegraphing a kick!', C.LIGHT_ORANGE)})
         return results
 
 
@@ -329,6 +430,7 @@ class DingoAI(HeuristicMonster):
     ENGAGE = 2
     FLEE_HP = 0.25
     ERRATIC = 0.3
+    SMELL = 8  # can smell the player from far away
 
     def _special_turn(self, target, fov_map, game_map, entities, dist):
         results = []
@@ -373,6 +475,7 @@ class DropbearAI(HeuristicMonster):
     AMBUSH = 1.5
     FLEE_HP = 0.2
     ENGAGE = 1
+    HEARING = 12  # hears explosions, grenades and didgeridoos from afar
 
     def __init__(self):
         super().__init__()
@@ -441,12 +544,23 @@ class EmuAI(HeuristicMonster):
 
 
 class WombatAI(HeuristicMonster):
-    """Slow tank: unshakeable, moves every other turn, never flees."""
+    """Slow tank: ignores you until hurt once, then hunts forever."""
     AGGRESSION = 0.7
     CAUTION = 0.0
     FLEE_HP = 0.0
     ENGAGE = 1
-    FAST = 0  # acts every other turn
+    SLOW = 2  # acts every other turn
+
+    def _update_state(self, target, fov_map, game_map, dist):
+        # Hurt once -> hunting forever (no going back).
+        if self.state == GRAZE and self.owner.fighter.hp < self.owner.fighter.max_hp:
+            self.state = HUNT
+            self.state_turns = 0
+
+    def _should_attack(self, target, game_map, entities):
+        if self.state != HUNT:
+            return False
+        return super()._should_attack(target, game_map, entities)
 
 
 class MagpieAI(HeuristicMonster):
@@ -492,9 +606,16 @@ class CassowaryAI(HeuristicMonster):
     FLEE_HP = 0.0
     ENGAGE = 1
 
+    def __init__(self):
+        super().__init__()
+        self.claw_ready = False
+
     def _attack(self, target):
         results = []
-        if randint(0, 100) < 30:
+        if self.claw_ready:
+            # The telegraphed dagger-claw strike lands.
+            self.claw_ready = False
+            self.owner.sprite_id = 'cassowary'
             damage = int(self.owner.fighter.power * 2) - target.fighter.defense
             results.append({'message': Message('The Cassowary lashes out with its dagger claw!', C.LIGHT_ORANGE)})
             if damage > 0:
@@ -502,6 +623,13 @@ class CassowaryAI(HeuristicMonster):
                 results.extend(target.fighter.take_damage(damage, attacker=self.owner))
             else:
                 results.append({'message': Message('The Cassowary strikes but does no damage.', C.WHITE)})
+            return results
+        if randint(0, 100) < 30:
+            # Rear up: visible telegraph, the big claw lands next contact.
+            self.claw_ready = True
+            self.owner.sprite_id = 'cassowary_rear'
+            results.append({'message': Message('The Cassowary rears back, dagger claw raised!', C.LIGHT_ORANGE)})
+            results.extend(self.owner.fighter.attack(target))
         else:
             results.extend(self.owner.fighter.attack(target))
         return results
@@ -514,7 +642,7 @@ class CrocodileAI(HeuristicMonster):
     AMBUSH = 1.3
     FLEE_HP = 0.0
     ENGAGE = 1
-    FAST = 0  # acts every other turn
+    SLOW = 2  # acts every other turn
 
 
 class EchidnaAI(HeuristicMonster):
@@ -524,7 +652,7 @@ class EchidnaAI(HeuristicMonster):
     CAUTION = 0.0
     FLEE_HP = 0.0
     ENGAGE = 1
-    FAST = 0  # acts every other turn
+    SLOW = 2  # acts every other turn
 
 
 class FunnelWebAI(HeuristicMonster):
@@ -552,6 +680,153 @@ class FunnelWebAI(HeuristicMonster):
         return results
 
 
+class QuokkaAI(HeuristicMonster):
+    """Friendly marsupial: approaches curiously, never attacks."""
+    AGGRESSION = 0.0
+    CAUTION = 0.8
+    FLEE_HP = 0.5
+    ENGAGE = 2
+    ERRATIC = 0.5
+
+    def _should_attack(self, target, game_map, entities):
+        return False  # never attacks
+
+
+class ThornyDevilAI(HeuristicMonster):
+    """Camouflaged lizard: slow, thorny, ambushes from cover."""
+    AGGRESSION = 0.7
+    CAUTION = 0.4
+    AMBUSH = 1.0
+    FLEE_HP = 0.3
+    ENGAGE = 1
+    SLOW = 2
+
+
+class BlueTongueAI(HeuristicMonster):
+    """Docile lizard: flees when threatened."""
+    AGGRESSION = 0.3
+    CAUTION = 0.9
+    FLEE_HP = 0.6
+    ENGAGE = 1
+    ERRATIC = 0.6
+
+
+class WedgeTailedEagleAI(HeuristicMonster):
+    """Swooper like the magpie, but faster on the approach."""
+    AGGRESSION = 1.1
+    CAUTION = 0.4
+    ERRATIC = 1.0
+    FLEE_HP = 0.25
+    ENGAGE = 2
+
+    def __init__(self):
+        super().__init__()
+        self.swoop_cooldown = 0
+
+    def _special_turn(self, target, fov_map, game_map, entities, dist):
+        results = []
+        self.swoop_cooldown = max(0, self.swoop_cooldown - 1)
+        if self.swoop_cooldown == 0 and dist <= 4 and dist > 1.5:
+            self.swoop_cooldown = 5
+            moved = 0
+            while moved < 2 and self.owner.distance_to(target) > 1.5:
+                dx = 1 if target.x > self.owner.x else (-1 if target.x < self.owner.x else 0)
+                dy = 1 if target.y > self.owner.y else (-1 if target.y < self.owner.y else 0)
+                if dx == 0 and dy == 0:
+                    break
+                nx, ny = self.owner.x + dx, self.owner.y + dy
+                if game_map.is_blocked(nx, ny) or self._blocked_by(entities, nx, ny):
+                    break
+                self.owner.move(dx, dy)
+                moved += 1
+            if self.owner.distance_to(target) < 2:
+                results.append({'message': Message('The Wedge-tailed Eagle swoops down and strikes!', C.LIGHT_GRAY)})
+                results.extend(self.owner.fighter.attack(target))
+        return results
+
+
+class FeralCamelAI(HeuristicMonster):
+    """Neutral tank: only fights once it has been hurt."""
+    AGGRESSION = 0.5
+    CAUTION = 0.2
+    FLEE_HP = 0.0
+    ENGAGE = 1
+    STATE = GRAZE
+
+    def _update_state(self, target, fov_map, game_map, dist):
+        if self.state == GRAZE and self.owner.fighter.hp < self.owner.fighter.max_hp:
+            self.state = HUNT
+            self.state_turns = 0
+
+    def _should_attack(self, target, game_map, entities):
+        if self.state != HUNT:
+            return False
+        return super()._should_attack(target, game_map, entities)
+
+
+class PythonAI(HeuristicMonster):
+    """Constrictor: wraps its coils around the target for several turns."""
+    AGGRESSION = 1.2
+    CAUTION = 0.3
+    FLEE_HP = 0.2
+    ENGAGE = 1
+
+    def __init__(self):
+        super().__init__()
+        self.constricting = False
+        self.constrict_turns = 0
+
+    def _attack(self, target):
+        results = []
+        if not self.constricting and randint(0, 100) < 40:
+            self.constricting = True
+            self.constrict_turns = 3
+            results.append({'message': Message('The Python wraps around {0}!'.format(target.name), C.LIGHT_ORANGE)})
+            damage = int(self.owner.fighter.power * 1.5) - target.fighter.defense
+            if damage > 0:
+                results.append({'message': Message('The Python constricts {0} for {1} hit points!'.format(target.name, damage), C.WHITE)})
+                results.extend(target.fighter.take_damage(damage, attacker=self.owner))
+        elif self.constricting:
+            self.constrict_turns -= 1
+            damage = int(self.owner.fighter.power * 1.2) - target.fighter.defense
+            if damage > 0:
+                results.append({'message': Message('The Python squeezes {0} for {1} hit points!'.format(target.name, damage), C.WHITE)})
+                results.extend(target.fighter.take_damage(damage, attacker=self.owner))
+            if self.constrict_turns <= 0:
+                self.constricting = False
+                results.append({'message': Message('The Python releases {0}.'.format(target.name), C.LIGHT_GRAY)})
+        else:
+            results.extend(self.owner.fighter.attack(target))
+        return results
+
+
+class RedbackAI(HeuristicMonster):
+    """Venomous spider: webs its target on a successful bite."""
+    AGGRESSION = 1.3
+    CAUTION = 0.3
+    FLEE_HP = 0.25
+    ENGAGE = 1
+    ERRATIC = 0.7
+
+    def _attack(self, target):
+        results = []
+        if randint(0, 100) < 50:
+            damage = int(self.owner.fighter.power * 1.4) - target.fighter.defense
+            results.append({'message': Message(
+                'The Redback Spider bites {0} and injects venom!'.format(target.name), C.GREEN)})
+            if damage > 0:
+                results.append({'message': Message(
+                    'The venom burns {0} for {1} hit points!'.format(target.name, damage), C.WHITE)})
+                results.extend(target.fighter.take_damage(damage, attacker=self.owner))
+            # Web the target: it loses its next move.
+            if hasattr(target, 'fighter') and target.fighter:
+                results.append({'webbed': target, 'turns': 1})
+        else:
+            results.append({'message': Message('The bite leaves no mark.', C.WHITE)})
+            results.extend(self.owner.fighter.attack(target))
+        return results
+
+
 class StunnedMonster:
     """Wraps another AI for a few turns of confused wandering (stun grenade)."""
 
@@ -559,7 +834,7 @@ class StunnedMonster:
         self.previous_ai = previous_ai
         self.number_of_turns = number_of_turns
 
-    def take_turn(self, target, fov_map, game_map, entities):
+    def take_turn(self, target, fov_map, game_map, entities, noise_map=None):
         results = []
         if self.number_of_turns > 0:
             random_x = self.owner.x + randint(0, 2) - 1

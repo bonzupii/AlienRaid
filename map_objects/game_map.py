@@ -36,6 +36,7 @@ class GameMap:
         self.blocked = bytearray([1]) * (width * height)
         self.block_sight = bytearray([1]) * (width * height)
         self.explored = bytearray(width * height)
+        self.brush = bytearray(width * height)
 
     # ------------------------------------------------------------- tile utils
     def idx(self, x, y):
@@ -53,6 +54,12 @@ class GameMap:
         if not self.in_bounds(x, y):
             return True
         return self.block_sight[self.idx(x, y)] != 0
+
+    def is_brush(self, x, y):
+        """Scrub/grass that blocks sight but not movement."""
+        if not self.in_bounds(x, y):
+            return False
+        return self.brush[self.idx(x, y)] != 0
 
     def _find_free_tile(self, x, y, entities):
         """Nearest free tile to (x, y), used to place stairs/ship/parts."""
@@ -98,12 +105,20 @@ class GameMap:
                     player.y = new_y
                 else:
                     (prev_x, prev_y) = rooms[num_rooms - 1].center()
+                    # Winding tracks: jog through a mid-point so corridors
+                    # feel like bush trails instead of straight tunnels.
                     if randint(0, 1) == 1:
-                        self.create_h_tunnel(prev_x, new_x, prev_y)
-                        self.create_v_tunnel(prev_y, new_y, new_x)
+                        mid_x = (prev_x + new_x) // 2 + randint(-2, 2)
+                        mid_x = max(1, min(self.width - 2, mid_x))
+                        self.create_h_tunnel(prev_x, mid_x, prev_y)
+                        self.create_v_tunnel(prev_y, new_y, mid_x)
+                        self.create_h_tunnel(mid_x, new_x, new_y)
                     else:
-                        self.create_v_tunnel(prev_y, new_y, prev_x)
-                        self.create_h_tunnel(prev_x, new_x, new_y)
+                        mid_y = (prev_y + new_y) // 2 + randint(-2, 2)
+                        mid_y = max(1, min(self.height - 2, mid_y))
+                        self.create_v_tunnel(prev_y, mid_y, prev_x)
+                        self.create_h_tunnel(prev_x, new_x, mid_y)
+                        self.create_v_tunnel(mid_y, new_y, new_x)
 
                 self.place_entities(new_room, entities)
                 rooms.append(new_room)
@@ -113,7 +128,9 @@ class GameMap:
             px, py = self._find_free_tile(last_center[0], last_center[1], entities)
             player.x, player.y = px, py
 
+        self._place_landmarks(entities)
         self._place_stairs_and_quest(first_center, last_center, entities)
+        self._place_brush(entities)
 
     def create_room(self, room):
         for x in range(room.x1 + 1, room.x2):
@@ -130,6 +147,97 @@ class GameMap:
         for y in range(min(y1, y2), max(y1, y2) + 1):
             self.blocked[self.idx(x, y)] = 0
             self.block_sight[self.idx(x, y)] = 0
+
+    # ------------------------------------------------------------ landmarks
+    def _stamp(self, pattern, x, y, occupied=None):
+        """Stamp a small set-piece onto the map. ``#`` = solid,
+        ``.``/``w`` = passable ground (w = billabong water). Tiles already
+        holding an entity are left alone so nothing spawns inside a wall."""
+        occupied = occupied or set()
+        for dy, row in enumerate(pattern):
+            for dx, ch in enumerate(row):
+                nx, ny = x + dx, y + dy
+                if not self.in_bounds(nx, ny):
+                    continue
+                if (nx, ny) in occupied:
+                    continue
+                idx = self.idx(nx, ny)
+                if ch == '#':
+                    self.blocked[idx] = 1
+                    self.block_sight[idx] = 1
+                elif ch in ('.', 'w'):
+                    self.blocked[idx] = 0
+                    self.block_sight[idx] = 0
+
+    def _place_landmarks(self, entities):
+        """Stamp outback set-pieces appropriate for the current floor."""
+        level = self.dungeon_level
+        occupied = {(e.x, e.y) for e in entities}
+
+        # Billabongs: water pools, croc ambush country (floors 6-10).
+        if level in range(6, 11):
+            for _ in range(randint(1, 2)):
+                bx = randint(5, self.width - 10)
+                by = randint(5, self.height - 10)
+                self._stamp([
+                    '...www...',
+                    '..wwwww..',
+                    '.wwwwwww.',
+                    'wwwwwwwww',
+                    '.wwwwwww.',
+                    '..wwwww..',
+                    '...www...',
+                ], bx, by, occupied=occupied)
+
+        # Termite mounds: pillar clusters (floors 1-15).
+        if level in range(1, 16):
+            for _ in range(randint(2, 4)):
+                mx = randint(5, self.width - 8)
+                my = randint(5, self.height - 8)
+                self._stamp(['.#.', '###', '.#.'], mx, my, occupied=occupied)
+
+        # Dingo fences: a long straight line with a gap (signature chokepoint).
+        if level in [3, 7, 11, 15, 19]:
+            fy = randint(10, self.height - 10)
+            gap_x = randint(20, self.width - 20)
+            for x in range(5, self.width - 5):
+                if abs(x - gap_x) > 2 and (x, fy) not in occupied:
+                    idx = self.idx(x, fy)
+                    self.blocked[idx] = 1
+                    self.block_sight[idx] = 1
+
+        # Kopjes: rock outcrops that block everything (floors 11-20).
+        if level in range(11, 21):
+            for _ in range(randint(1, 3)):
+                kx = randint(5, self.width - 12)
+                ky = randint(5, self.height - 12)
+                self._stamp([
+                    '....####....',
+                    '...######...',
+                    '..########..',
+                    '.##########.',
+                    '############',
+                    '.##########.',
+                ], kx, ky, occupied=occupied)
+
+    def _place_brush(self, entities):
+        """Scatter sight-blocking scrub on open ground (dappled FOV)."""
+        if self.dungeon_level <= 5:
+            density = 15
+        elif self.dungeon_level <= 10:
+            density = 10
+        elif self.dungeon_level <= 15:
+            density = 5
+        else:
+            density = 2
+
+        for y in range(1, self.height - 1):
+            for x in range(1, self.width - 1):
+                idx = self.idx(x, y)
+                if self.blocked[idx] == 0 and randint(1, 100) <= density:
+                    if not any(e.x == x and e.y == y for e in entities):
+                        self.brush[idx] = 1
+                        self.block_sight[idx] = 1
 
     def place_entities(self, room, entities):
         level = self.dungeon_level
@@ -199,12 +307,16 @@ class GameMap:
     # ------------------------------------------------------------ transitions
     def go_down(self, player, message_log, constants):
         self.dungeon_level += 1
+        from loader_functions.initialize_new_game import biome_for_level
+        constants.setdefault('colors', {}).update(biome_for_level(self.dungeon_level))
         entities = self._new_level(player, message_log, constants, start_at='first', heal=True)
         message_log.add_message(Message('You take the trail and descend into the darkness.', C.LIGHT_VIOLET))
         return entities
 
     def go_up(self, player, message_log, constants):
         self.dungeon_level -= 1
+        from loader_functions.initialize_new_game import biome_for_level
+        constants.setdefault('colors', {}).update(biome_for_level(self.dungeon_level))
         entities = self._new_level(player, message_log, constants, start_at='last', heal=False)
         message_log.add_message(Message('You climb back toward the surface.', C.LIGHT_GREEN))
         return entities
@@ -214,6 +326,7 @@ class GameMap:
         self.blocked = bytearray([1]) * (self.width * self.height)
         self.block_sight = bytearray([1]) * (self.width * self.height)
         self.explored = bytearray(self.width * self.height)
+        self.brush = bytearray(self.width * self.height)
         self.make_map(constants['max_rooms'], constants['room_min_size'],
                       constants['room_max_size'], constants['map_width'],
                       constants['map_height'], player, entities, start_at=start_at)

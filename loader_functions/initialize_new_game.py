@@ -20,6 +20,52 @@ from map_objects.game_map import GameMap
 from renderer import palette as C
 
 
+def biome_for_level(level):
+    """Color palette for the current biome band.
+
+    1-5:   red-dirt scrub
+    6-10:  creek country (billabongs)
+    11-15: limestone caves
+    16-20: the hollow (alien glow)
+    """
+    if level <= 5:
+        return {
+            'dark_wall': (100, 20, 10),
+            'dark_ground': (170, 90, 10),
+            'light_wall': (140, 60, 10),
+            'light_ground': (210, 130, 50),
+            'dark_brush': (130, 70, 15),
+            'light_brush': (180, 110, 45),
+        }
+    elif level <= 10:
+        return {
+            'dark_wall': (80, 60, 40),
+            'dark_ground': (140, 110, 70),
+            'light_wall': (110, 90, 60),
+            'light_ground': (180, 150, 100),
+            'dark_brush': (100, 80, 50),
+            'light_brush': (150, 120, 80),
+        }
+    elif level <= 15:
+        return {
+            'dark_wall': (90, 90, 90),
+            'dark_ground': (60, 60, 60),
+            'light_wall': (120, 120, 120),
+            'light_ground': (90, 90, 90),
+            'dark_brush': (70, 70, 70),
+            'light_brush': (100, 100, 100),
+        }
+    else:
+        return {
+            'dark_wall': (60, 40, 80),
+            'dark_ground': (40, 30, 60),
+            'light_wall': (90, 70, 120),
+            'light_ground': (70, 50, 100),
+            'dark_brush': (50, 40, 70),
+            'light_brush': (80, 60, 110),
+        }
+
+
 def get_constants():
     window_title = 'Alien Raid'
 
@@ -44,12 +90,9 @@ def get_constants():
     fov_light_walls = True
     fov_radius = 12
 
-    colors = {
-        'dark_wall': C.DARK_WALL,
-        'dark_ground': C.DARK_GROUND,
-        'light_wall': C.LIGHT_WALL,
-        'light_ground': C.LIGHT_GROUND,
-    }
+    # Biome palette for the starting band (red dirt); deeper floors swap
+    # palettes on transition (see GameMap.go_down / go_up).
+    colors = biome_for_level(1)
 
     constants = {
         'window_title': window_title,

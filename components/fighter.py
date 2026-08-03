@@ -6,13 +6,15 @@ from renderer import palette as C
 
 
 class Fighter:
-    def __init__(self, hp, defense, power, xp=0, thorns=0):
+    def __init__(self, hp, defense, power, xp=0, thorns=0, base_defense_bonus=0):
         self.base_max_hp = hp
         self.hp = hp
         self.base_defense = defense
         self.base_power = power
         self.xp = xp
         self.thorns = thorns  # damage dealt back to whoever hits this fighter
+        self.base_defense_bonus = base_defense_bonus  # permanent bonus (vegemite)
+        self.status = {}  # 'webbed': n, 'speed': n, 'invisible': n, ...
 
     @property
     def max_hp(self):
@@ -36,13 +38,16 @@ class Fighter:
             bonus = self.owner.equipment.defense_bonus
         else:
             bonus = 0
-        return self.base_defense + bonus
+        return self.base_defense + self.base_defense_bonus + bonus
 
     def take_damage(self, amount, attacker=None):
         results = []
         self.hp -= amount
         if self.hp <= 0:
             results.append({'dead': self.owner, 'xp': self.xp})
+        # Let the world know who hurt us (pack morale reacts to this).
+        if attacker is not None and attacker is not self.owner:
+            results.append({'hurt': self.owner, 'attacker': attacker})
         # Quills / thorns: the attacker gets pricked back. Note the intent:
         # if the killing blow and the quill-prick both land, the results carry
         # two 'dead' entries (kill_monster + kill_player) — death-quills on a
@@ -61,6 +66,26 @@ class Fighter:
         self.hp += amount
         if self.hp > self.max_hp:
             self.hp = self.max_hp
+
+    def add_status(self, status_type, turns):
+        """Add or extend a timed status effect."""
+        if status_type in self.status:
+            self.status[status_type] += turns
+        else:
+            self.status[status_type] = turns
+
+    def has_status(self, status_type):
+        return status_type in self.status and self.status[status_type] > 0
+
+    def tick_statuses(self):
+        """Decrement all status timers; returns the list of expired ones."""
+        expired = []
+        for status_type in list(self.status.keys()):
+            self.status[status_type] -= 1
+            if self.status[status_type] <= 0:
+                expired.append(status_type)
+                del self.status[status_type]
+        return expired
 
     def attack(self, target):
         results = []

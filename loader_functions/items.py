@@ -11,7 +11,9 @@ from functions.render_order import RenderOrder
 from functions.item_functions import (heal, morphine_pack, gain_xp,
                                       use_shock_charge, use_boomerang,
                                       use_didgeridoo, use_plasma_grenade,
-                                      use_stun_grenade, use_ray_gun)
+                                      use_stun_grenade, use_ray_gun,
+                                      eat_emu_egg, eat_taipan_meat,
+                                      eat_dropbear_meat, eat_vegemite)
 from renderer import palette as C
 
 # spawn tables: [chance, min_dungeon_level] pairs
@@ -26,6 +28,8 @@ ITEM_TABLES = {
     'eucalyptus_tea':      [[8, 1], [10, 4], [8, 7]],
     'funnel_web_antivenom': [[0, 6], [10, 9], [10, 12]],
     'emu_egg':             [[0, 8], [8, 10], [8, 14]],
+    'taipan_meat':         [[0, 6], [15, 9], [25, 12], [20, 15], [15, 19]],
+    'dropbear_meat':       [[0, 8], [15, 10], [25, 13], [30, 16]],
     # weapons / tools
     'plasma_grenade':      [[8, 3], [12, 5], [10, 8], [6, 12]],
     'stun_grenade':        [[10, 2], [12, 4], [8, 7]],
@@ -58,11 +62,13 @@ ITEM_DEFS = {
     'med_kit':             ('icon_cross', C.MEDKIT_RED, 'consume', {'use_function': morphine_pack, 'amount': 500}),
     'morphine_pack':       ('icon_bottle', C.MORPHINE_BROWN, 'consume', {'use_function': morphine_pack, 'amount': 350}),
     'golden_wattle_salve': ('icon_bottle', C.GOLD, 'consume', {'use_function': heal, 'amount': 800}),
-    'vegemite_ration':     ('icon_ration', C.DARK_YELLOW, 'consume', {'use_function': heal, 'amount': 150}),
+    'vegemite_ration':     ('icon_ration', C.DARK_YELLOW, 'consume', {'use_function': eat_vegemite, 'amount': 150}),
     'bush_tucker':         ('icon_star', C.LIGHT_GREEN, 'consume', {'use_function': gain_xp, 'amount': 400}),
     'eucalyptus_tea':      ('icon_tea', (60, 120, 60), 'consume', {'use_function': heal, 'amount': 250}),
     'funnel_web_antivenom': ('icon_bottle', (60, 120, 60), 'consume', {'use_function': heal, 'amount': 400}),
-    'emu_egg':             ('icon_ration', (245, 245, 235), 'consume', {'use_function': heal, 'amount': 550}),
+    'emu_egg':             ('icon_ration', (245, 245, 235), 'consume', {'use_function': eat_emu_egg, 'amount': 550}),
+    'taipan_meat':         ('icon_ration', (139, 125, 60), 'consume', {'use_function': eat_taipan_meat, 'amount': 300}),
+    'dropbear_meat':       ('icon_ration', C.DROPBEAR_GREY, 'consume', {'use_function': eat_dropbear_meat, 'amount': 400}),
     'plasma_grenade':      ('icon_grenade', C.CYAN, 'consume', {
         'use_function': use_plasma_grenade, 'targeting': True,
         'targeting_message': Message('Left-click an enemy to lob the Plasma Grenade at it, or right-click to cancel.', C.LIGHT_CYAN),
@@ -96,7 +102,8 @@ DISPLAY_NAMES = {
     'morphine_pack': 'Morphine Pack', 'golden_wattle_salve': 'Golden Wattle Salve',
     'vegemite_ration': 'Vegemite Ration', 'bush_tucker': 'Bush Tucker',
     'eucalyptus_tea': 'Eucalyptus Tea', 'funnel_web_antivenom': 'Funnel-web Antivenom',
-    'emu_egg': 'Emu Egg', 'plasma_grenade': 'Plasma Grenade',
+    'emu_egg': 'Emu Egg', 'taipan_meat': 'Taipan Meat',
+    'dropbear_meat': 'Dropbear Meat', 'plasma_grenade': 'Plasma Grenade',
     'stun_grenade': 'Stun Grenade', 'shock_charge': 'Shock Charge',
     'ray_gun': 'Ray Gun', 'boomerang': 'Boomerang', 'didgeridoo': 'Didgeridoo',
     'tentacruels': 'Tentacruel', 'energy_shield': 'Energy Shield',

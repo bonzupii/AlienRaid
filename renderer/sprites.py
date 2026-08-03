@@ -640,6 +640,147 @@ def _icon_tube(s, c):
     ], _palette(c), top=1)
 
 
+# ---------------------------------------------------------------------------
+# Telegraph poses + phase-4 species
+# ---------------------------------------------------------------------------
+
+def _sprite_kanga_rear(s, c):
+    """Kanga rearing back, telegraphing a kick."""
+    _paint(s, [
+        ".......o.o..",
+        ".......o.o..",
+        "......oooo..",
+        ".....obbbeo.",
+        "...oobbbbbdd",
+        "..olbbbbo...",
+        "..obbbbbbo..",
+        "..obbbddbod.",
+        "..dobbbbo...",
+        ".d..obbbo...",
+        ".d..d..d....",
+        "d..dddddd...",
+    ], _palette(c))
+
+
+def _sprite_cassowary_rear(s, c):
+    """Cassowary rearing for its dagger-claw strike."""
+    pal = _palette(c)
+    pal['r'] = EMBER
+    _paint(s, [
+        "......ll",
+        ".....ooo",
+        "....obebd",
+        ".....bbr",
+        ".....bb",
+        "..ooobboo",
+        ".obbbbbbo",
+        ".obdbdbbo",
+        ".obbbbbbo",
+        ".ooooooo",
+        "...dd.dd",
+        "..ddd.ddd",
+    ], pal)
+
+
+def _sprite_quokka(s, c):
+    _paint(s, [
+        ".......dd",
+        ".......dd",
+        "......ooo",
+        ".....obbeo",
+        ".....obbdd",
+        "...oobbo",
+        "..obbbbo",
+        "..obbbbo",
+        ".d..d..d",
+        "d..dddd",
+    ], _palette(c), top=2)
+
+
+def _sprite_thorny_devil(s, c):
+    _paint(s, [
+        "..l.l.l.l",
+        "..ooooooo",
+        ".obbbbbbbo",
+        ".obbbbbbeod",
+        ".obbbbbbbod",
+        "..ouuuuuo",
+        "...d..d",
+    ], _palette(c), top=4)
+
+
+def _sprite_blue_tongue(s, c):
+    pal = _palette(c)
+    pal['t'] = (70, 140, 235)  # the namesake blue tongue
+    _paint(s, [
+        ".......ooo",
+        ".......obe",
+        ".......obt",
+        "......b",
+        ".oooooo",
+        ".obbbbo",
+        ".oooooo",
+        "...d..d",
+    ], pal, top=3)
+
+
+def _sprite_wedge_tailed_eagle(s, c):
+    pal = _palette(c)
+    pal['a'] = WING
+    _paint(s, [
+        "....aaa",
+        "...aaaa",
+        "..aaaaaa",
+        ".obbbbbbo",
+        ".obbbbbo",
+        "..oooo",
+        "...dd",
+    ], pal, top=3)
+
+
+def _sprite_feral_camel(s, c):
+    _paint(s, [
+        "......oo",
+        ".....obbo",
+        "....obbbb",
+        "...obbbbb",
+        "..obbbbbb",
+        ".obbbbbbb",
+        ".obbbbbbb",
+        "..ddddddd",
+        "..d...d",
+        ".dd..dd",
+    ], _palette(c), top=2)
+
+
+def _sprite_python(s, c):
+    _paint(s, [
+        ".......oo",
+        "......obe",
+        ".....ob",
+        "....b",
+        "...b",
+        "..b",
+        ".bbbbbb",
+        ".obbbbo",
+        "..oooo",
+    ], _palette(c), top=3)
+
+
+def _sprite_redback(s, c):
+    pal = _palette(c)
+    pal['r'] = EMBER
+    _paint(s, [
+        "..d...d",
+        ".oooooo",
+        ".orrrro",
+        "ddobbbod",
+        ".obbbbo",
+        "..oooo",
+        ".d..d.d",
+    ], pal, top=3)
+
+
 def _sprite_unknown(s, c):
     pygame.draw.rect(s, (255, 0, 255), pygame.Rect(0, 0, TILE, TILE))
 
@@ -660,6 +801,15 @@ RECIPES = {
     'wombat': _sprite_wombat,
     'magpie': _sprite_magpie,
     'cassowary': _sprite_cassowary,
+    'cassowary_rear': _sprite_cassowary_rear,
+    'kanga_rear': _sprite_kanga_rear,
+    'quokka': _sprite_quokka,
+    'thorny_devil': _sprite_thorny_devil,
+    'blue_tongue': _sprite_blue_tongue,
+    'wedge_tailed_eagle': _sprite_wedge_tailed_eagle,
+    'feral_camel': _sprite_feral_camel,
+    'python': _sprite_python,
+    'redback': _sprite_redback,
     'crocodile': _sprite_crocodile,
     'echidna': _sprite_echidna,
     'funnel_web': _sprite_funnel_web,

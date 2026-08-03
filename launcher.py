@@ -16,6 +16,8 @@ import pygame
 from random import randint
 
 from functions.death_functions import kill_monster, kill_player
+from functions.senses import NoiseMap
+from components.ai import HeuristicMonster, GRAZE, HUNT, FLEE
 from components.entity import get_blocking_entities_at_location
 from algorithms.fov import compute_fov
 from components.game_messages import Message
@@ -88,9 +90,15 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
     targeting_item = None
     wait_timer = 0
     mouse_tile = (0, 0)
+    noise_map = NoiseMap(game_map.width, game_map.height)
     clock = pygame.time.Clock()
 
     while True:
+        # Fresh ears each player turn: noise from the previous turn is wiped
+        # before the player acts, so events this turn are heard the same turn.
+        if game_state == GameStates.PLAYERS_TURN:
+            noise_map.clear()
+
         action = {}
         mouse_action = {}
         for event in pygame.event.get():
@@ -146,25 +154,29 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
         player_turn_results = []
 
         if move and game_state == GameStates.PLAYERS_TURN:
-            dx, dy = move
-            destination_x = player.x + dx
-            destination_y = player.y + dy
-
-            if wait_timer > 0:
-                if randint(0, 7) == 7:
-                    wait_timer -= 5
-
-            passive_regen(player, message_log)
-
-            if not game_map.is_blocked(destination_x, destination_y):
-                target = get_blocking_entities_at_location(entities, destination_x, destination_y)
-                if target:
-                    player_turn_results.extend(player.fighter.attack(target))
-                else:
-                    player.move(dx, dy)
-                    _collect_ship_part(player, entities, message_log)
-                    fov_recompute = True
+            if player.fighter.has_status('webbed'):
+                message_log.add_message(Message('You are tangled in sticky spider web!', C.GREEN))
                 game_state = GameStates.ENEMY_TURN
+            else:
+                dx, dy = move
+                destination_x = player.x + dx
+                destination_y = player.y + dy
+
+                if wait_timer > 0:
+                    if randint(0, 7) == 7:
+                        wait_timer -= 5
+
+                passive_regen(player, message_log)
+
+                if not game_map.is_blocked(destination_x, destination_y):
+                    target = get_blocking_entities_at_location(entities, destination_x, destination_y)
+                    if target:
+                        player_turn_results.extend(player.fighter.attack(target))
+                    else:
+                        player.move(dx, dy)
+                        _collect_ship_part(player, entities, message_log)
+                        fov_recompute = True
+                    game_state = GameStates.ENEMY_TURN
 
         elif wait and game_state == GameStates.PLAYERS_TURN:
             wait_timer, game_state = wait_action(player, message_log, wait_timer)
@@ -192,7 +204,8 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
 
             if game_state == GameStates.SHOW_INVENTORY:
                 player_turn_results.extend(player.inventory.use(
-                    item, entities=entities, fov_map=fov_map, game_map=game_map))
+                    item, entities=entities, fov_map=fov_map, game_map=game_map,
+                    noise_map=noise_map))
                 game_state = GameStates.ENEMY_TURN
             elif game_state == GameStates.DROP_INVENTORY:
                 player_turn_results.extend(player.inventory.drop_item(item))
@@ -227,7 +240,8 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
                 target_x, target_y = left_click
                 player_turn_results.extend(player.inventory.use(
                     targeting_item, entities=entities, fov_map=fov_map,
-                    game_map=game_map, target_x=target_x, target_y=target_y))
+                    game_map=game_map, target_x=target_x, target_y=target_y,
+                    noise_map=noise_map))
             elif right_click:
                 player_turn_results.append({'targeting_cancelled': True})
 
@@ -255,24 +269,88 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
             game_state, previous_game_state)
 
         if game_state == GameStates.ENEMY_TURN:
+            # Tick the player's status effects (speed / invisibility / web).
+            expired = player.fighter.tick_statuses()
+            for status in expired:
+                if status == 'speed':
+                    message_log.add_message(Message('Your speed boost wears off.', C.YELLOW))
+                elif status == 'poison_resist':
+                    message_log.add_message(Message('Your poison resistance fades.', C.YELLOW))
+                elif status == 'invisible':
+                    message_log.add_message(Message('You are no longer invisible.', C.YELLOW))
+                elif status == 'webbed':
+                    message_log.add_message(Message('You tear free of the sticky web.', C.LIGHT_GRAY))
+
             for entity in entities:
                 if entity.ai:
-                    enemy_turn_results = entity.ai.take_turn(player, fov_map, game_map, entities)
+                    enemy_turn_results = entity.ai.take_turn(
+                        player, fov_map, game_map, entities, noise_map)
 
                     for enemy_turn_result in enemy_turn_results:
                         message = enemy_turn_result.get('message')
                         dead_entity = enemy_turn_result.get('dead')
+                        hurt_entity = enemy_turn_result.get('hurt')
+                        webbed = enemy_turn_result.get('webbed')
 
                         if message:
                             message_log.add_message(message)
+
+                        if webbed and webbed.fighter:
+                            webbed.fighter.add_status('webbed',
+                                                      enemy_turn_result.get('turns', 1))
+                            message_log.add_message(Message(
+                                'You are caught in sticky spider web!', C.GREEN))
+
+                        if hurt_entity:
+                            # Group morale: nearby pack-mates react to a hurt
+                            # ally (timid scatter, dingoes hesitate, brutes enrage).
+                            for other in entities:
+                                if other is hurt_entity or not other.ai or not other.fighter:
+                                    continue
+                                if not isinstance(other.ai, HeuristicMonster) \
+                                        or not isinstance(hurt_entity.ai, HeuristicMonster):
+                                    continue
+                                if type(other.ai) is not type(hurt_entity.ai):
+                                    continue
+                                if other.distance_to(hurt_entity) > 6:
+                                    continue
+                                roll = randint(0, 100)
+                                if other.ai.FLEE_HP > 0.3 and roll < 30:
+                                    other.ai.state = FLEE
+                                    other.ai.state_turns = 0
+                                elif other.ai.PACK > 0 and roll < 40:
+                                    other.ai.slow_tick += 1  # hesitate a turn
+                                elif other.ai.CAUTION == 0 and roll < 50:
+                                    other.ai.state = HUNT
+                                    other.ai.state_turns = 0
 
                         if dead_entity:
                             if dead_entity == player:
                                 message, game_state = kill_player(dead_entity)
                             else:
+                                # Capture the species before kill_monster nuls it.
+                                dead_ai = dead_entity.ai
                                 message = kill_monster(dead_entity)
 
                             message_log.add_message(message)
+
+                            if dead_entity is not player:
+                                # Morale on death: nearby allies react.
+                                for other in entities:
+                                    if other is dead_entity or not other.ai or not other.fighter:
+                                        continue
+                                    if not isinstance(other.ai, HeuristicMonster):
+                                        continue
+                                    if type(other.ai) is not type(dead_ai):
+                                        continue
+                                    if other.distance_to(dead_entity) > 6:
+                                        continue
+                                    if other.ai.FLEE_HP > 0.3:
+                                        other.ai.state = FLEE
+                                    elif other.ai.PACK > 0:
+                                        other.ai.slow_tick += 1  # hesitate
+                                    elif other.ai.CAUTION == 0:
+                                        other.ai.state = HUNT
 
                             if game_state == GameStates.PLAYER_DEAD:
                                 break

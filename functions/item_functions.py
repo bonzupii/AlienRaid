@@ -15,7 +15,7 @@ def _in_fov(fov_map, game_map, x, y):
     return fov_map[y * game_map.width + x] != 0
 
 
-def heal(entity, amount=200, entities=None, fov_map=None, game_map=None):
+def heal(entity, amount=200, entities=None, fov_map=None, game_map=None, noise_map=None):
     results = []
     if entity.fighter.hp == entity.fighter.max_hp:
         results.append({'consumed': False, 'message': Message('You are already at full health', C.YELLOW)})
@@ -25,7 +25,7 @@ def heal(entity, amount=200, entities=None, fov_map=None, game_map=None):
     return results
 
 
-def morphine_pack(entity, amount=350, entities=None, fov_map=None, game_map=None):
+def morphine_pack(entity, amount=350, entities=None, fov_map=None, game_map=None, noise_map=None):
     results = []
     if entity.fighter.hp == entity.fighter.max_hp:
         results.append({'consumed': False, 'message': Message('You are already at full health', C.YELLOW)})
@@ -35,12 +35,12 @@ def morphine_pack(entity, amount=350, entities=None, fov_map=None, game_map=None
     return results
 
 
-def gain_xp(entity, amount=400, entities=None, fov_map=None, game_map=None):
+def gain_xp(entity, amount=400, entities=None, fov_map=None, game_map=None, noise_map=None):
     return [{'consumed': True, 'xp': amount,
              'message': Message('You scarf down the bush tucker. (gained {0} XP)'.format(amount), C.GREEN)}]
 
 
-def use_shock_charge(entity, entities=None, fov_map=None, game_map=None, damage=350, maximum_range=5):
+def use_shock_charge(entity, entities=None, fov_map=None, game_map=None, damage=350, maximum_range=5, noise_map=None):
     results = []
     target = None
     closest_distance = maximum_range + 1
@@ -62,7 +62,7 @@ def use_shock_charge(entity, entities=None, fov_map=None, game_map=None, damage=
     return results
 
 
-def use_boomerang(entity, entities=None, fov_map=None, game_map=None, damage=120, maximum_range=8):
+def use_boomerang(entity, entities=None, fov_map=None, game_map=None, damage=120, maximum_range=8, noise_map=None):
     results = []
     target = None
     closest_distance = maximum_range + 1
@@ -84,8 +84,10 @@ def use_boomerang(entity, entities=None, fov_map=None, game_map=None, damage=120
     return results
 
 
-def use_didgeridoo(entity, entities=None, fov_map=None, game_map=None, turns=6):
+def use_didgeridoo(entity, entities=None, fov_map=None, game_map=None, turns=6, noise_map=None):
     results = []
+    if noise_map:
+        noise_map.emit(entity.x, entity.y, 8, 'didgeridoo')
     stunned = 0
     for e in entities:
         if e.ai and e is not entity and _in_fov(fov_map, game_map, e.x, e.y):
@@ -104,13 +106,16 @@ def use_didgeridoo(entity, entities=None, fov_map=None, game_map=None, turns=6):
     return results
 
 
-def use_plasma_grenade(entity, entities=None, fov_map=None, game_map=None, damage=250, radius=3, target_x=None, target_y=None):
+def use_plasma_grenade(entity, entities=None, fov_map=None, game_map=None, damage=250, radius=3, target_x=None, target_y=None, noise_map=None):
     results = []
 
     if not _in_fov(fov_map, game_map, target_x, target_y):
         results.append({'consumed': False,
                         'message': Message('You cannot target a tile outside of your field of view!', C.YELLOW)})
         return results
+
+    if noise_map:
+        noise_map.emit(target_x, target_y, 10, 'explosion')
 
     results.append({'consumed': True,
                     'message': Message('The plasma grenade explodes, burning everything within {0} tiles!'.format(radius), C.ORANGE)})
@@ -122,7 +127,7 @@ def use_plasma_grenade(entity, entities=None, fov_map=None, game_map=None, damag
     return results
 
 
-def use_stun_grenade(entity, entities=None, fov_map=None, game_map=None, target_x=None, target_y=None):
+def use_stun_grenade(entity, entities=None, fov_map=None, game_map=None, target_x=None, target_y=None, noise_map=None):
     results = []
 
     if not _in_fov(fov_map, game_map, target_x, target_y):
@@ -144,7 +149,7 @@ def use_stun_grenade(entity, entities=None, fov_map=None, game_map=None, target_
     return results
 
 
-def use_ray_gun(entity, entities=None, fov_map=None, game_map=None, damage=80, maximum_range=11):
+def use_ray_gun(entity, entities=None, fov_map=None, game_map=None, damage=80, maximum_range=11, noise_map=None):
     results = []
     target = None
     closest_distance = maximum_range + 1
@@ -167,4 +172,49 @@ def use_ray_gun(entity, entities=None, fov_map=None, game_map=None, damage=80, m
     else:
         results.append({'consumed': False, 'target': None,
                         'message': Message('No enemy is close enough to shoot.', C.RED)})
+    return results
+
+
+def eat_emu_egg(entity, amount=550, entities=None, fov_map=None, game_map=None, noise_map=None):
+    """Emu egg: heal + a temporary speed boost."""
+    results = []
+    entity.fighter.heal(amount)
+    entity.fighter.add_status('speed', 10)
+    results.append({'consumed': True,
+                    'message': Message('You eat the emu egg. (speed +10 turns)', C.GREEN)})
+    return results
+
+
+def eat_taipan_meat(entity, amount=300, entities=None, fov_map=None, game_map=None, noise_map=None):
+    """Taipan meat: heal + temporary poison resistance."""
+    results = []
+    entity.fighter.heal(amount)
+    entity.fighter.add_status('poison_resist', 20)
+    results.append({'consumed': True,
+                    'message': Message('You eat the taipan meat. (poison resistance +20 turns)', C.GREEN)})
+    return results
+
+
+def eat_dropbear_meat(entity, amount=400, entities=None, fov_map=None, game_map=None, noise_map=None):
+    """Dropbear meat: heal + brief invisibility, but it draws attention."""
+    results = []
+    entity.fighter.heal(amount)
+    entity.fighter.add_status('invisible', 15)
+    results.append({'consumed': True,
+                    'message': Message('You eat the dropbear meat. You feel invisible... but something stirs.', C.GREEN)})
+    results.append({'message': Message('A hungry Dropbear has caught your scent!', C.DARK_RED)})
+    return results
+
+
+def eat_vegemite(entity, amount=150, entities=None, fov_map=None, game_map=None, noise_map=None):
+    """Vegemite: heal + a one-time permanent +1 defense."""
+    results = []
+    entity.fighter.heal(amount)
+    if entity.fighter.base_defense_bonus == 0:
+        entity.fighter.base_defense_bonus = 1
+        results.append({'consumed': True,
+                        'message': Message('You eat the vegemite. (+1 permanent defense)', C.GREEN)})
+    else:
+        results.append({'consumed': True,
+                        'message': Message('You eat the vegemite. (your defense is already hardened)', C.YELLOW)})
     return results
