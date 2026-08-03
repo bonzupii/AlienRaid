@@ -119,6 +119,40 @@ class TestCharsetTool(unittest.TestCase):
             self.assertEqual(data['char_map'], {'A': [0, 0]})
             self.assertEqual(data['cols'], 3)
 
+    def test_special_glyph_palette(self):
+        """The palette covers the non-typeable glyphs (arrows, triangles,
+        diamonds, checkboxes, radio), and every icon actually draws ink."""
+        symbols = [s for s, _ in tool.SPECIAL_GLYPHS]
+        for needed in ('←', '↑', '→', '↓', '▲', '▼', '◆', '◇',
+                       '☐', '☑', '○', '◉'):
+            self.assertIn(needed, symbols)
+        surf = pygame.Surface((24, 24), pygame.SRCALPHA)
+        for sym, _ in tool.SPECIAL_GLYPHS:
+            surf.fill((0, 0, 0, 0))
+            tool._draw_special(surf, 12, 12, sym, (255, 255, 255, 255))
+            ink = sum(1 for x in range(24) for y in range(24)
+                      if surf.get_at((x, y))[3] > 0)
+            self.assertGreater(ink, 0,
+                               'palette symbol {0!r} drew nothing'.format(sym))
+
+    def test_unicode_and_named_labels_roundtrip(self):
+        """Special-glyph (unicode) and custom-name labels survive the JSON
+        round-trip, and both appear in the char map."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = make_atlas(tmp)
+            cells, cols, rows = tool.load_and_split(path)
+            states = tool.new_states(cols, rows, cells)
+            states[(0, 0)] = {'state': tool.STATE_CHAR, 'char': '←'}
+            states[(2, 0)] = {'state': tool.STATE_CHAR, 'char': 'checkbox_checked'}
+            js = os.path.join(tmp, 'map.json')
+            tool.save_states(js, path, 12, cols, rows, states)
+            data, loaded = tool.load_states(js)
+            self.assertEqual(loaded[(0, 0)], {'state': 'char', 'char': '←'})
+            self.assertEqual(loaded[(2, 0)],
+                             {'state': 'char', 'char': 'checkbox_checked'})
+            self.assertEqual(data['char_map']['←'], [0, 0])
+            self.assertEqual(data['char_map']['checkbox_checked'], [2, 0])
+
     def test_duplicate_char_last_wins_and_reported(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = make_atlas(tmp)

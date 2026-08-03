@@ -9,6 +9,8 @@ the rest are leftover sprites (mobs, terrain, equipment) that must NEVER be
 used for text. This tool walks every cell and lets you label it:
 
     type any character key  -> cell contains that character
+    click a palette button  -> arrow / radio / checkbox / triangle / diamond
+    F6 then type + Enter    -> label the cell with a custom name
     Delete                  -> cell is a SPRITE (excluded from the charset)
     F2                      -> cell is empty (blank)
     F3                      -> undo, back to "unidentified"
@@ -69,10 +71,22 @@ STATE_LABEL = {
     STATE_EMPTY:  'empty',
 }
 
+# Special glyphs that cannot be typed on a keyboard: arrows, triangles,
+# diamonds, checkboxes and radio boxes. The GUI shows these as clickable
+# palette buttons; the symbol becomes the cell's label. The names are for
+# hover hints. (symbol, name)
+SPECIAL_GLYPHS = [
+    ('←', 'arrow left'), ('↑', 'arrow up'), ('→', 'arrow right'), ('↓', 'arrow down'),
+    ('↖', 'arrow up-left'), ('↗', 'arrow up-right'), ('↙', 'arrow down-left'), ('↘', 'arrow down-right'),
+    ('▲', 'triangle up'), ('▼', 'triangle down'),
+    ('◆', 'diamond filled'), ('◇', 'diamond outline'),
+    ('☐', 'checkbox empty'), ('☑', 'checkbox checked'),
+    ('○', 'radio empty'), ('◉', 'radio checked'),
+]
+
 HINTS = (
-    'type a character = label cell | Delete = sprite | F2 = empty | F3 = undo',
-    'arrows / click = select | Tab = next unidentified | wheel = zoom',
-    'F4 = copy label to identical cells | Esc = save & quit',
+    'type char = label | Del = sprite | F2 = empty | F3 = undo | Tab = next | F4 = batch | wheel = zoom',
+    'click the palette below = arrows / radio / checkbox | F6 = name (Esc cancels) | Esc = save & quit',
 )
 
 
@@ -284,6 +298,46 @@ def _next_todo(states, cols, rows, after):
     return after
 
 
+def _draw_special(surface, cx, cy, symbol, color):
+    """Procedurally draw one of the special glyphs (arrows, triangles,
+    diamonds, checkboxes, radios) so the palette never depends on the
+    system font having the symbol."""
+    arrows = {
+        '←': (-1, 0), '↑': (0, -1), '→': (1, 0), '↓': (0, 1),
+        '↖': (-1, -1), '↗': (1, -1), '↙': (-1, 1), '↘': (1, 1),
+    }
+    if symbol in arrows:
+        dx, dy = arrows[symbol]
+        tip = (cx + dx * 8, cy + dy * 8)
+        base = (cx + dx * 4, cy + dy * 4)
+        pygame.draw.line(surface, color, (cx - dx * 5, cy - dy * 5), base, 2)
+        px, py = -dy, dx
+        pygame.draw.polygon(surface, color, [
+            tip, (base[0] + px * 3, base[1] + py * 3),
+            (base[0] - px * 3, base[1] - py * 3)])
+    elif symbol == '▲':
+        pygame.draw.polygon(surface, color,
+                            [(cx, cy - 8), (cx - 7, cy + 6), (cx + 7, cy + 6)])
+    elif symbol == '▼':
+        pygame.draw.polygon(surface, color,
+                            [(cx, cy + 8), (cx - 7, cy - 6), (cx + 7, cy - 6)])
+    elif symbol == '◆':
+        pygame.draw.polygon(surface, color,
+                            [(cx, cy - 8), (cx + 7, cy), (cx, cy + 8), (cx - 7, cy)])
+    elif symbol == '◇':
+        pygame.draw.polygon(surface, color,
+                            [(cx, cy - 8), (cx + 7, cy), (cx, cy + 8), (cx - 7, cy)], 2)
+    elif symbol in ('☐', '☑'):
+        pygame.draw.rect(surface, color, (cx - 7, cy - 7, 14, 14), 2)
+        if symbol == '☑':
+            pygame.draw.lines(surface, color, False,
+                              [(cx - 4, cy), (cx - 1, cy + 3), (cx + 5, cy - 3)], 2)
+    elif symbol in ('○', '◉'):
+        pygame.draw.circle(surface, color, (cx, cy), 7, 2)
+        if symbol == '◉':
+            pygame.draw.circle(surface, color, (cx, cy), 3)
+
+
 def run_gui(atlas_path, cell, json_path, export):
     pygame.init()
     screen = pygame.display.set_mode((1280, 760), pygame.RESIZABLE)
@@ -347,6 +401,9 @@ def run_gui(atlas_path, cell, json_path, export):
     zw = 3          # overview zoom (px per atlas px)
     ovx = ovy = 0   # placeholders until the first layout pass
     needs_fit = True
+    name_mode = False
+    name_buf = ''
+    pal_rects = []  # [(symbol, name, rect)]
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -355,8 +412,24 @@ def run_gui(atlas_path, cell, json_path, export):
                 screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
                 needs_fit = True
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+                if name_mode:
+                    if event.key == pygame.K_ESCAPE:
+                        name_mode = False
+                    elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                        if name_buf:
+                            selected = assign(STATE_CHAR, name_buf)
+                        name_mode = False
+                    elif event.key == pygame.K_BACKSPACE:
+                        name_buf = name_buf[:-1]
+                    else:
+                        ch = event.unicode
+                        if ch and ch.isprintable() and len(name_buf) < 24:
+                            name_buf += ch
+                elif event.key == pygame.K_ESCAPE:
                     running = False
+                elif event.key == pygame.K_F6:
+                    name_mode = True
+                    name_buf = ''
                 elif event.key == pygame.K_TAB:
                     selected = _next_todo(states, cols, rows, selected)
                 elif event.key == pygame.K_DELETE:
@@ -389,10 +462,18 @@ def run_gui(atlas_path, cell, json_path, export):
                 if event.button in (4, 5):
                     zw = max(1, min(8, zw + (1 if event.button == 4 else -1)))
                 else:
-                    c = (mx - ovx) // (cell * zw)
-                    r = (my - ovy) // (cell * zw)
-                    if 0 <= c < cols and 0 <= r < rows:
-                        selected = (c, r)
+                    hit = None
+                    for sym, _name, rect in pal_rects:
+                        if rect.collidepoint(mx, my):
+                            hit = sym
+                            break
+                    if hit is not None:
+                        selected = assign(STATE_CHAR, hit)
+                    else:
+                        c = (mx - ovx) // (cell * zw)
+                        r = (my - ovy) // (cell * zw)
+                        if 0 <= c < cols and 0 <= r < rows:
+                            selected = (c, r)
             elif event.type == pygame.MOUSEWHEEL:
                 zw = max(1, min(8, zw + event.y))
 
@@ -410,6 +491,23 @@ def run_gui(atlas_path, cell, json_path, export):
         bz = max(4, min(40, (H - 260) // cell))
         big = cell * bz
         bx = W - right_w + 30
+
+        # special-glyph palette geometry
+        btn_w, btn_h, gap = 46, 36, 6
+        per_row = max(1, (W - 40) // (btn_w + gap))
+        spec_rows = (len(SPECIAL_GLYPHS) + per_row - 1) // per_row
+        if spec_rows > 3:   # keep the palette compact on narrow tiles
+            per_row = (len(SPECIAL_GLYPHS) + 2) // 3
+            btn_w = max(24, (W - 40) // per_row - gap)
+            spec_rows = (len(SPECIAL_GLYPHS) + per_row - 1) // per_row
+        pal_h = spec_rows * btn_h + (spec_rows - 1) * gap
+        pal_y = H - 46 - pal_h - 12
+        pal_rects = []
+        for i, (sym, name) in enumerate(SPECIAL_GLYPHS):
+            r, c = divmod(i, per_row)
+            pal_rects.append((sym, name, pygame.Rect(
+                20 + c * (btn_w + gap), pal_y + r * (btn_h + gap),
+                btn_w, btn_h)))
 
         # --- draw ----------------------------------------------------------
         screen.fill((12, 16, 20))
@@ -450,6 +548,10 @@ def run_gui(atlas_path, cell, json_path, export):
         st = states[selected]['state']
         screen.blit(font.render(STATE_LABEL[st], True, (150, 160, 170)), (bx, 66))
         yy = 92
+        if name_mode:
+            screen.blit(font.render('name: {0}_'.format(name_buf), True,
+                                    (150, 220, 150)), (bx, yy))
+            yy += 30
         if st == STATE_CHAR:
             screen.blit(font_big.render(repr(states[selected].get('char', '')),
                                         True, (255, 240, 150)), (bx, yy))
@@ -466,6 +568,22 @@ def run_gui(atlas_path, cell, json_path, export):
         _checker(screen, bx, by, big, big, max(3, bz))
         screen.blit(cell_scaled(c0, r0, bz), (bx, by))
         pygame.draw.rect(screen, (80, 92, 104), (bx, by, big, big), 1)
+
+        # special-glyph palette (click to label arrows / radio / checkboxes)
+        mouse = pygame.mouse.get_pos()
+        hover_name = None
+        for sym, name, rect in pal_rects:
+            hover = rect.collidepoint(mouse)
+            if hover:
+                hover_name = name
+            pygame.draw.rect(screen, (24, 31, 38), rect)
+            pygame.draw.rect(screen, (255, 220, 80) if hover else (60, 70, 80),
+                             rect, 1)
+            _draw_special(screen, rect.centerx, rect.centery - 2, sym,
+                          (240, 246, 255))
+        if hover_name and pal_y - 26 > ovy + overview_h:
+            screen.blit(font.render(hover_name, True, (200, 210, 220)),
+                        (20, pal_y - 24))
 
         # hints
         y = H - 46
@@ -499,8 +617,9 @@ def main(argv):
     ap = argparse.ArgumentParser(
         description='Identify the glyphs in the hand-drawn bitmap font.',
         epilog='In the GUI: type a character to label the selected cell, '
-               'Delete = sprite, F2 = empty, F3 = undo, Tab = next '
-               'unidentified, Esc = save & quit.')
+               'click the palette for arrows/radio/checkbox, F6 for a '
+               'custom name, Delete = sprite, F2 = empty, F3 = undo, '
+               'Tab = next unidentified, Esc = save & quit.')
     ap.add_argument('--atlas', default='alienraid12x12.png',
                     help='atlas PNG (default: alienraid12x12.png in repo root)')
     ap.add_argument('--cell-size', type=int, default=CELL)
