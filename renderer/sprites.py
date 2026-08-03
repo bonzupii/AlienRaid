@@ -1,29 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SpriteLoader — hand-authored pixel-art edition.
+SpriteLoader — hand-authored pixel-art edition, v2.
 
-All mobs, the player, items, the trails, the ship and corpses are rendered as
-**procedurally generated graphics**: 12x12 pixel maps, blitted pixel by pixel
-and cached as ``pygame.Surface`` objects keyed by ``(sprite_id, color)``.
+v2 fixes learned from the rendered sheet:
+* dark base colors (dropbear, magpie, funnel-web, vest...) get a LIGHT rim
+  and lighter mid-tones so they never vanish into dark floors;
+* no floating pixels: tongues, steam, pins and tails are anchored;
+* 2px ears/tails/legs and cream underbellies make species silhouettes read.
 
-Each recipe is a list of strings (``''``/``'.'`` = transparent) painted onto a
-12x12 SRCALPHA surface.  Characters map to colours derived from the entity's
-base colour ``c``:
-
-    o  hard outline        shade(c, 0.45)
-    d  shadow / secondary  shade(c, 0.70)
-    b  body fill           c
-    l  top highlight       shade(c, 1.35)
-    e  eye (near black)    w  white        k  black
-    n  bone                a  wing membrane
-    g  cockpit / core glow y  gold accent  r  red accent
-
-12x12 style guide (unchanged from the original):
-* a 1px dark rim defines every silhouette,
-* light comes from above ('l' sits on the top rows),
-* creatures face right and stand on the ground line (y = 10..11),
-* eyes are dark pixels, with a white glint where room allows.
+Character map (``.``/``''`` = transparent):
+    o  outline (dark rim, or light rim on dark bodies)
+    d  shadow / secondary (lighter mid on dark bodies)
+    b  body fill           l  top highlight
+    u  cream underbelly    e  eye            w  white   k  black
+    n  bone  a  wing membrane  g  glow  y  gold  r  red
 """
 import pygame
 from renderer.palette import shade
@@ -33,29 +24,30 @@ TILE = 12
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 EYE = (20, 20, 20)
-
-BONE = (224, 222, 210)      # skulls & crossed bones
-WING = (205, 225, 255)      # insect wing membrane
-GLOW = (140, 255, 220)      # alien cockpit / ship-part core
-GOLD = (255, 210, 70)       # dropbear eyes, magpie beak
-EMBER = (225, 60, 50)       # cassowary wattle
+BONE = (224, 222, 210)
+WING = (205, 225, 255)
+GLOW = (140, 255, 220)
+GOLD = (255, 210, 70)
+EMBER = (225, 60, 50)
+CREAM = (235, 220, 185)
 
 
 def _palette(c):
-    """Standard shading ramp derived from the entity's base color."""
-    return {
-        'o': shade(c, 0.45),
-        'd': shade(c, 0.70),
-        'b': c,
-        'l': shade(c, 1.35),
-        'e': EYE,
-        'w': WHITE,
-        'k': BLACK,
-    }
+    """Shading ramp; dark bodies are rim-lit so they stay readable."""
+    lum = sum(c) / 3.0
+    if lum < 80:
+        o = tuple(min(255, max(96, int(v * 2.8))) for v in c)
+        d = tuple(min(255, max(64, int(v * 1.7))) for v in c)
+        l = tuple(min(255, max(140, int(v * 3.2))) for v in c)
+    else:
+        o = shade(c, 0.45)
+        d = shade(c, 0.70)
+        l = shade(c, 1.35)
+    return {'o': o, 'd': d, 'b': c, 'l': l, 'e': EYE, 'w': WHITE,
+            'k': BLACK, 'u': CREAM}
 
 
 def _paint(surf, rows, pal, top=0):
-    """Blit pixel-map ``rows`` onto ``surf``; unknown/blank cells stay clear."""
     for i, row in enumerate(rows):
         y = top + i
         if y >= TILE:
@@ -69,102 +61,103 @@ def _paint(surf, rows, pal, top=0):
 
 
 # ---------------------------------------------------------------------------
-# Creatures — all face right, feet on the y = 10..11 ground line.
+# Creatures
 # ---------------------------------------------------------------------------
 
 def _sprite_player(s, c):
     _paint(s, [
-        "...d....d...",    # antennae
-        "....d..d....",
-        "....oooo....",    # big round head
-        "..oobbbboo..",
-        "..obwbbwbo..",    # eye glints
-        "..obebbebo..",    # alien eyes
-        "..oobbbboo..",
-        "....oooo....",
-        "...obllbo...",    # chest highlight
+        "..d......d..",
+        "...d....d...",
+        "...oooooo...",
         "..obbbbbbo..",
-        "..d..dd..d..",    # tentacle arms
+        "..obwbbwbo..",
+        "..obebbebo..",
+        "..obbbbbbo..",
+        "..oobbbboo..",
+        "...obllbo...",
+        ".obbbbbbbbo.",
+        ".dd..dd..dd.",
         ".d..d..d..d.",
     ], _palette(c))
 
 
 def _sprite_kanga(s, c):
     _paint(s, [
-        ".......o.o..",    # ears
-        ".......o.o..",
-        "......oooo..",    # head
-        ".....obbbeo.",
-        "...oobbbbbdd",    # neck + dark snout
-        "..olbbbbo...",    # chest
-        "..obbbbbbo..",
-        "..obbbddbod.",    # pouch + little arm
-        "..dobbbbo...",    # tail
-        ".d..obbbo...",
-        ".d..d..d....",    # legs
-        "d..dddddd...",    # tail tip + big foot
+        ".......dd.dd",   # thick ears
+        ".......dd.dd",
+        ".......oooo.",
+        ".......obbeo",
+        "...oobbbbbdd",   # neck + snout
+        "..odbbbbo...",
+        "..odbbuuo...",   # cream belly
+        "..odbbuuo...",
+        ".ddobuuo....",   # tail joins body
+        "dd..obbo....",
+        "d...dd.dd...",
+        "...ddddddd..",   # big foot
     ], _palette(c))
 
 
 def _sprite_joey(s, c):
     _paint(s, [
-        ".......o.o..",
-        ".......o.o..",
+        ".......d.d..",
+        ".......d.d..",
         "......oooo..",
-        ".....obbbeo.",
-        ".....obbbbdd",
-        "...oobbbbo..",
-        "..obbbbbbo..",
-        "..dobbbbbo..",
-        ".d..d..d....",
-        "d..dddddd...",
+        "......obbeo.",
+        "....oobbbdd.",
+        "...obbbbo...",
+        "...dbbuo....",
+        "..ddobuo....",
+        ".dd..obo....",
+        "d...dddd....",
     ], _palette(c), top=1)
 
 
 def _sprite_wallaby(s, c):
     _paint(s, [
-        ".......o.o..",
-        ".......o.o..",
+        ".......d..d.",   # long ears
+        ".......d..d.",
+        ".......d..d.",
         "......oooo..",
-        ".....obbbeo.",
-        ".....obbbbdd",
-        "..oobbbbbo..",    # leaner, horizontal body
-        ".obbbbbbbo..",
-        "d.obbbbbbo..",    # long tail
-        "dd..obbbbo..",
-        "....d...d...",
-        "...ddddddd..",    # long feet
+        "......obbeo.",
+        "......obbdd.",
+        "..oobbbbo...",
+        ".obbbbbbo...",
+        "dd.obuuo....",
+        "dd..obbo....",
+        "d...d..d....",
+        "...dddddd...",
     ], _palette(c))
 
 
 def _sprite_wallaroo(s, c):
     _paint(s, [
-        "......o.o...",
-        "......o.o...",
-        ".....ooooo..",
-        "....obbbbeo.",
-        "....obbbbbdd",
-        ".oobbbbbbo..",
-        "obbbbbbbbo..",    # bulky barrel body
-        "obbbbbbbbod.",    # thick arm
-        ".obbbbbbbod.",
-        ".dobbbbbo...",
-        "dd..d...d...",
-        "d..dddddddd.",    # huge feet
+        "......dd.dd.",
+        "......dd.dd.",
+        "......oooo..",
+        ".....obbeo.",
+        ".....obbbdd.",
+        ".oobbbbbbo..",   # barrel body
+        "obbbbbbbbo..",
+        "obbbbbbubod.",   # thick arm
+        ".obbbbbubod.",
+        ".dobbbbuo...",
+        "dd..dd..dd..",
+        "d..dddddddd.",   # huge feet
     ], _palette(c))
 
 
 def _sprite_tree_kanga(s, c):
     _paint(s, [
-        ".....o..o...",
-        ".....o..o...",
-        "....ooooo...",
-        "...obbbbeo.",
-        "...obbbbdd..",
-        "dd.obbbbo.dd",    # arms held out
-        ".d.obbbbo.d.",
-        "..obbbbbbo..",    # upright body
-        "..obbbbbo...",
+        "d....d..d...",   # long tail up + ears
+        "d...ooooo...",
+        "d...obbeo...",
+        "d...obbbdd..",
+        "dd.obbbbo.dd",   # arms out
+        ".d.obuubo.d.",
+        "...obuubo...",
+        "...obbbbo...",
+        "....obbo....",
         "....d..d....",
         "...dd..dd...",
     ], _palette(c))
@@ -172,15 +165,15 @@ def _sprite_tree_kanga(s, c):
 
 def _sprite_dingo(s, c):
     _paint(s, [
-        "........o.o.",    # pointed ears
-        "........o.o.",
-        ".d.....oooo.",    # bushy tail raised
-        "dd.....obebo",
-        "dd.....obbdd",    # snout
-        ".oobbbbbbo..",
+        "........d.d.",
+        "........d.d.",
+        ".dd....oooo.",   # bushy tail, joined
+        ".ddd...obbeo",
+        "..dd...obbkd",   # black nose
+        "..oobbbbbo..",
+        ".obbbbbbbo..",
         ".obbbbbbbo..",
         ".obbbbbbo...",
-        "..dd...dd...",
         "..dd...dd...",
         "..dd...dd...",
         "..ddd..ddd..",
@@ -189,30 +182,30 @@ def _sprite_dingo(s, c):
 
 def _sprite_goanna(s, c):
     _paint(s, [
-        "..........ll",    # forked tongue
-        "d..........l",
-        ".d......oooo",    # tail + head top
-        "..dooooobebo",
-        "..dobbbbbbdo",    # low body + jaw
-        "....oooooo..",
-        "...d....d...",    # splayed legs
-        "..d......d..",
-    ], _palette(c), top=3)
+        "..........ll",   # forked tongue
+        "d.......ooo.l",
+        ".d.....obebl",   # tongue at mouth
+        "..doooobbbbd",
+        "..dbbbbbbbd.",
+        "...oooooo...",
+        "..dd....dd..",   # splayed legs
+        ".d......d...",
+    ], _palette(c), top=4)
 
 
 def _sprite_killer_bee(s, c):
     pal = _palette(c)
     pal['a'] = WING
     _paint(s, [
-        "..aaa.aaa",     # wings
-        ".........k.k",  # antennae
-        "...ooooo.oo",   # thorax rim + head
-        "..obkbkbooeo",  # striped abdomen
+        "..aaa.aaa",
+        "....a..a.k.k",  # wings join thorax + antennae
+        "...ooooo.oo",
+        "..obkbkbooeo",
         "..obkbkbooeo",
         "..obkbkbo",
         "...obkbo",
         "...oooo",
-        "..k",           # stinger
+        "..k",
         ".k",
     ], pal, top=1)
 
@@ -221,26 +214,26 @@ def _sprite_dropbear(s, c):
     pal = _palette(c)
     pal['y'] = GOLD
     _paint(s, [
-        "..dd..dd",      # ears
-        ".oobbbbbo",
-        "obyybbyybo",    # glowing eyes
+        "..dd..dd..",   # light fluffy ears
+        ".obbbbbbo.",
+        "obyybbyybo",   # gold eyes
         "obbbbbbbbo",
-        "obbbddbbbo",    # big nose
-        ".obbbbbbo",
-        "..oooooo",
-        ".d.d..d.d.",    # claws
+        "obbbkkbbbo",   # black nose
+        ".obbbbbbo.",
+        "..oooooo..",
+        ".l.l..l.l.",   # light claws
     ], pal, top=3)
 
 
 def _sprite_taipan(s, c):
     _paint(s, [
-        ".......oooo",   # raised head
-        ".......obeo",
-        ".......obbol",  # tongue flick
-        "......b",       # neck
-        ".oooooo",       # coil
-        ".obdbbbbo",
-        ".obbbbbbo",
+        "..........ll",
+        ".......ooo.l",
+        ".......obed",   # tongue at mouth
+        "......b",
+        ".oooooo",
+        ".odbbdbo",     # banding
+        ".obbbdbo",
         ".ooooooo",
     ], _palette(c), top=3)
 
@@ -248,29 +241,29 @@ def _sprite_taipan(s, c):
 def _sprite_emu(s, c):
     _paint(s, [
         ".....ooo",
-        "....obebd",     # beak
+        "....obebd",
         ".....obb",
-        ".....dd",       # dark neck
+        ".....dd",
+        ".....dd",
         ".....dd",
         "..ooooddoo",
-        ".obbbbbbo",     # shaggy body
-        ".obdbdbbo",
         ".obbbbbbo",
+        ".obdbdbbo",    # shaggy texture
         ".ooooooo",
-        "....d.d",       # long legs
+        "....d.d",
         "...dd.dd",
     ], _palette(c))
 
 
 def _sprite_wombat(s, c):
     _paint(s, [
-        "..oo.oo",       # round ears
-        ".oobbbbbbo",
+        "..dd..dd..",
+        ".obbbbbbo.",
         "obbbbbbbbo",
-        "obbbbbbebbdd",  # eye + nose
-        "obbbbbbbbddd",  # big nose
-        ".oooooooo",
-        "..dd..dd",      # stubby legs
+        "obbbbbbebbkk",  # black nose
+        "obbbbbbbkkk",
+        ".ollllllo.",    # light belly
+        "..dd..dd..",
     ], _palette(c), top=4)
 
 
@@ -280,13 +273,13 @@ def _sprite_magpie(s, c):
     _paint(s, [
         ".......oooo",
         "......obebo",
-        "..ooooobbbyy",  # yellow beak
-        ".obbbbbbo",
-        ".obbbwwbo",     # white belly
-        ".obbbwwo",
-        "dd.oooooo",     # tail
-        "dd..d.d",
-        "d..dd.dd",
+        "..ooooobbbyy",
+        ".owbbbbbo...",   # white nape
+        ".obbbwwbo...",   # white belly
+        ".obbwwwo....",
+        "dd.oooooo...",   # tail
+        "dd..d.d.....",
+        "w..dd.dd....",   # white tail tip
     ], pal, top=2)
 
 
@@ -297,24 +290,23 @@ def _sprite_cassowary(s, c):
         "......ll",      # casque
         ".....ooo",
         "....obebd",
-        ".....bbr",      # red wattle
+        ".....bbr",      # wattle joined to neck
         ".....bb",
         "..ooobboo",
         ".obbbbbbo",
         ".obdbdbbo",
-        ".obbbbbbo",
         ".ooooooo",
-        "...dd.dd",      # strong legs
-        "..ddd.ddd",     # deadly claws
+        "...dd.dd",
+        "..ddd.ddd",     # dagger claws
     ], pal)
 
 
 def _sprite_crocodile(s, c):
     _paint(s, [
-        ".d.l.l.l.o",      # tail, back ridges, eye bump
+        ".d.l.l.l.o",
         ".dobbbbboebo",
-        ".dobbbbbbbbb",    # long snout
-        ".dobbbbbow.w",    # teeth
+        ".dobbbbbbbbb",
+        ".dobbbbboww.",   # teeth under jaw
         ".dooooooo",
         "...d...d",
         "..dd..dd",
@@ -323,25 +315,27 @@ def _sprite_crocodile(s, c):
 
 def _sprite_echidna(s, c):
     _paint(s, [
-        "..l.l.l.l",       # quills
-        "..ooooooo",
-        ".obbbbbbbo",
-        ".obbbbbbeodd",    # eye + long snout
-        ".obbbbbbbod",
-        "..ooooooo",
-        "...d..d",
+        "...l..l..l..",
+        "..ll.ll.ll..",   # joined quill triangles
+        "..ooooooo...",
+        ".obbbbbbo.",
+        ".obbbbbbeodd",
+        ".obbbbbbbod.",
+        "..ouuuuuo...",
+        "...d..d.....",
     ], _palette(c), top=4)
 
 
 def _sprite_funnel_web(s, c):
     _paint(s, [
-        "..d...d",         # legs
-        "..oooooo",        # abdomen
+        ".dd....dd...",   # thick legs
+        "..d....d....",
+        "..oooooo..",
         ".dobbbbo.d",
-        "d.obbbboeeod",    # eyes
-        ".dobbbboobo",     # cephalothorax
-        "..oooooodd",      # fangs
-        ".d..d.d..d",
+        "ddobbbbowedd",   # glinting eyes
+        ".dobbbbood.",
+        "..oooooodd",     # fangs
+        ".dd.dd.dd...",
     ], _palette(c), top=2)
 
 
@@ -354,12 +348,12 @@ def _sprite_corpse(s, c):
     pal['n'] = BONE
     pal['d'] = shade(c, 0.6)
     _paint(s, [
-        "...nnnnn",      # skull
+        "...nnnnn",
         "..nnnnnnn",
-        "..ndnnndn",     # eye sockets
-        "..nnndnnn",     # nose
-        "...ndndn",      # teeth
-        "..n...n",       # crossed bones
+        "..ndnnndn",
+        "..nnndnnn",
+        "...ndndn",
+        "..n...n",
         "...n.n",
         "....n",
         "...n.n",
@@ -395,14 +389,14 @@ def _sprite_ship(s, c):
     pal = _palette(c)
     pal['g'] = GLOW
     _paint(s, [
-        "....oooo",        # dome
+        "....oooo",
         "...obbbbo",
-        "...obgbbo",       # cockpit glow
+        "...obgbbo",
         "...obbbbo",
-        ".oooooooooo",     # saucer rim
+        ".oooooooooo",
         "obllbbbbbbbo",
         ".obbbddbbbo",
-        "...d...d",        # landing legs
+        "...d...d",
         "..dd..dd",
     ], pal, top=2)
 
@@ -414,7 +408,7 @@ def _sprite_part(s, c):
         "....oooo",
         "...olbbbo",
         "..obbbbbbo",
-        "..obbggbbo",      # glowing core
+        "..obbggbbo",
         "..obbggbbo",
         "...obbbbo",
         "....oooo",
@@ -442,13 +436,12 @@ def _icon_cross(s, c):
 
 def _icon_bottle(s, c):
     _paint(s, [
-        ".....dd",       # cap
         ".....dd",
-        "....obbo",      # neck
+        ".....dd",
+        "....obbo",
         "....obbo",
         "...obbbbo",
-        "...obbbbo",
-        "...obllbo",     # label
+        "...obllbo",
         "...obllbo",
         "...obbbbo",
         "...oooooo",
@@ -457,9 +450,9 @@ def _icon_bottle(s, c):
 
 def _icon_grenade(s, c):
     _paint(s, [
-        ".oo..ddd",      # pin ring + cap
-        ".o....d",
-        ".oo...d",
+        ".oo..ddd",     # ring + cap
+        ".o.dd.d",      # strap joins ring to cap
+        ".oo.dd.d",
         "...oooooo",
         "..olbbbbbo",
         "..obbbbbbo",
@@ -472,10 +465,10 @@ def _icon_grenade(s, c):
 
 def _icon_gun(s, c):
     _paint(s, [
-        ".obbbbbbbbo",   # slide
+        ".obbbbbbbbo",
         ".obllbbbbbo",
         ".obbbbbbbbo",
-        "..dddd.d",      # grip + trigger
+        "..dddd.d",
         "..dddd",
         ".dddd",
         ".dddd",
@@ -488,7 +481,7 @@ def _icon_bolt(s, c):
         "...ollbo",
         "..ollbo",
         "..olbo",
-        "..oooooo",      # the jog
+        "..oooooo",
         "....olbo",
         "...olbo",
         "..olbo",
@@ -501,7 +494,7 @@ def _icon_tentacle(s, c):
     _paint(s, [
         "....lb",
         "...bb",
-        "..lb",          # suckers
+        "..lb",
         "..bb",
         "...lb",
         "....bb",
@@ -529,7 +522,7 @@ def _icon_shield(s, c):
 
 def _icon_twig(s, c):
     _paint(s, [
-        ".........ll",   # leaves
+        ".........ll",
         "........dd",
         ".......dd",
         "...ll.dd",
@@ -544,11 +537,11 @@ def _icon_twig(s, c):
 
 def _icon_hat(s, c):
     _paint(s, [
-        "....oooo",      # dome
+        "....oooo",
         "...obbbbo",
         "...obbbbo",
-        "...obddbo",     # band
-        ".oooooooooo.",  # brim
+        "...obddbo",
+        ".oooooooooo.",
         "obbbbbbbbbbo",
     ], _palette(c), top=4)
 
@@ -556,25 +549,25 @@ def _icon_hat(s, c):
 def _icon_neck(s, c):
     _paint(s, [
         "...oooooo",
-        "..o......o",
+        "..oo....oo",   # thicker chain
         "..o......o",
         "..o......o",
         "...o....o",
         "....oooo",
-        ".....ll",       # pendant
+        ".....ll",
         ".....ll",
     ], _palette(c), top=1)
 
 
 def _icon_vest(s, c):
     _paint(s, [
-        "..oo....oo",    # shoulder straps
+        "..ll....ll",   # light straps read on dark
         ".obbo..obbo",
+        ".obllllbo",
         ".obbbbbbo",
-        ".obbbbbbo",
-        ".obdbbdbo",     # pockets
         ".obdbbdbo",
-        ".obbbbbbo",
+        ".obdbbdbo",
+        ".obllllbo",
         "..obbbbo",
         "..oooooo",
     ], _palette(c), top=2)
@@ -594,9 +587,9 @@ def _icon_boomerang(s, c):
 def _icon_ration(s, c):
     _paint(s, [
         "...oooooo",
-        "...ollllo",     # lid
+        "...ollllo",
         "...obbbbo",
-        "...ollllo",     # label
+        "...ollllo",
         "...ollllo",
         "...obbbbo",
         "...oooooo",
@@ -605,12 +598,12 @@ def _icon_ration(s, c):
 
 def _icon_tea(s, c):
     _paint(s, [
-        "....l.l",       # steam
-        "",
+        "....l.l",      # steam zigzag, connected
+        "...l.l",
         "....l.l",
-        "",
-        "..oddddo",      # tea surface
-        "..obbbbooo",    # cup + handle
+        "...l.l",
+        "..oddddo",
+        "..obbbbooo",
         "..obbbbo.o",
         "..obbbbooo",
         "...oooo",
@@ -634,15 +627,15 @@ def _icon_star(s, c):
 
 def _icon_tube(s, c):
     _paint(s, [
-        ".........ld",   # mouthpiece
+        ".........ld",
         "........dd",
-        ".......ld",     # painted dots
+        ".......ld",
         "......dd",
         ".....ld",
         "....dd",
         "...ld",
         "..dd",
-        ".ddd",          # bell
+        ".ddd",
         "dddd",
     ], _palette(c), top=1)
 
@@ -651,7 +644,6 @@ def _sprite_unknown(s, c):
     pygame.draw.rect(s, (255, 0, 255), pygame.Rect(0, 0, TILE, TILE))
 
 
-# Registry: sprite_id -> recipe callable(surface, color)
 RECIPES = {
     'player': _sprite_player,
     'kanga': _sprite_kanga,
@@ -676,7 +668,6 @@ RECIPES = {
     'trail_up': _sprite_trail_up,
     'ship': _sprite_ship,
     'part': _sprite_part,
-    # item/equipment icons
     'icon_cross': _icon_cross,
     'icon_bottle': _icon_bottle,
     'icon_grenade': _icon_grenade,
