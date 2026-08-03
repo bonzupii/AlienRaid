@@ -6,3 +6,4 @@ __pycache__/
 savegame.dat
 sprite_sheet.png
 charset_sheet.png
+charset_cells/
