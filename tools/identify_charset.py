@@ -9,7 +9,7 @@ the rest are leftover sprites (mobs, terrain, equipment) that must NEVER be
 used for text. This tool walks every cell and lets you label it:
 
     type any character key  -> cell contains that character
-    click a palette button  -> arrow / radio / checkbox / triangle / diamond
+    click a palette button  -> arrow / triangle / double-arrow / radio / checkbox
     F6 then type + Enter    -> label the cell with a custom name
     Delete                  -> cell is a SPRITE (excluded from the charset)
     F2                      -> cell is empty (blank)
@@ -71,22 +71,21 @@ STATE_LABEL = {
     STATE_EMPTY:  'empty',
 }
 
-# Special glyphs that cannot be typed on a keyboard: arrows, triangles,
-# diamonds, checkboxes and radio boxes. The GUI shows these as clickable
-# palette buttons; the symbol becomes the cell's label. The names are for
-# hover hints. (symbol, name)
+# Special glyphs that cannot be typed on a keyboard: cardinal arrows,
+# triangles, double arrows, checkboxes and radio boxes. The GUI shows
+# these as clickable palette buttons; the symbol becomes the cell's label.
+# The names are for hover hints. (symbol, name)
 SPECIAL_GLYPHS = [
     ('←', 'arrow left'), ('↑', 'arrow up'), ('→', 'arrow right'), ('↓', 'arrow down'),
-    ('↖', 'arrow up-left'), ('↗', 'arrow up-right'), ('↙', 'arrow down-left'), ('↘', 'arrow down-right'),
-    ('▲', 'triangle up'), ('▼', 'triangle down'),
-    ('◆', 'diamond filled'), ('◇', 'diamond outline'),
-    ('☐', 'checkbox empty'), ('☑', 'checkbox checked'),
-    ('○', 'radio empty'), ('◉', 'radio checked'),
+    ('▲', 'triangle up'), ('▼', 'triangle down'), ('◀', 'triangle left'), ('▶', 'triangle right'),
+    ('↕', 'double arrow vertical'), ('↔', 'double arrow horizontal'),
+    ('☐', 'checkbox empty'), ('☑', 'checkbox full'),
+    ('○', 'radio empty'), ('◉', 'radio full'),
 ]
 
 HINTS = (
     'type char = label | Del = sprite | F2 = empty | F3 = undo | Tab = next | F4 = batch | wheel = zoom',
-    'click the palette below = arrows / radio / checkbox | F6 = name (Esc cancels) | Esc = save & quit',
+    'click the palette below = arrows / triangles / double arrows / radio / checkbox | F6 = name (Esc cancels) | Esc = save & quit',
 )
 
 
@@ -298,35 +297,44 @@ def _next_todo(states, cols, rows, after):
     return after
 
 
+def _arrow_head(surface, cx, cy, dx, dy, color):
+    """A filled arrowhead pointing along (dx, dy), tip 8px out."""
+    px, py = -dy, dx
+    tip = (cx + dx * 8, cy + dy * 8)
+    base = (cx + dx * 4, cy + dy * 4)
+    pygame.draw.polygon(surface, color, [
+        tip, (base[0] + px * 3, base[1] + py * 3),
+        (base[0] - px * 3, base[1] - py * 3)])
+
+
 def _draw_special(surface, cx, cy, symbol, color):
-    """Procedurally draw one of the special glyphs (arrows, triangles,
-    diamonds, checkboxes, radios) so the palette never depends on the
-    system font having the symbol."""
+    """Procedurally draw one of the special glyphs (cardinal arrows,
+    triangles, double arrows, checkboxes, radios) so the palette never
+    depends on the system font having the symbol."""
     arrows = {
         '←': (-1, 0), '↑': (0, -1), '→': (1, 0), '↓': (0, 1),
-        '↖': (-1, -1), '↗': (1, -1), '↙': (-1, 1), '↘': (1, 1),
     }
     if symbol in arrows:
         dx, dy = arrows[symbol]
-        tip = (cx + dx * 8, cy + dy * 8)
-        base = (cx + dx * 4, cy + dy * 4)
-        pygame.draw.line(surface, color, (cx - dx * 5, cy - dy * 5), base, 2)
-        px, py = -dy, dx
-        pygame.draw.polygon(surface, color, [
-            tip, (base[0] + px * 3, base[1] + py * 3),
-            (base[0] - px * 3, base[1] - py * 3)])
-    elif symbol == '▲':
-        pygame.draw.polygon(surface, color,
-                            [(cx, cy - 8), (cx - 7, cy + 6), (cx + 7, cy + 6)])
-    elif symbol == '▼':
-        pygame.draw.polygon(surface, color,
-                            [(cx, cy + 8), (cx - 7, cy - 6), (cx + 7, cy - 6)])
-    elif symbol == '◆':
-        pygame.draw.polygon(surface, color,
-                            [(cx, cy - 8), (cx + 7, cy), (cx, cy + 8), (cx - 7, cy)])
-    elif symbol == '◇':
-        pygame.draw.polygon(surface, color,
-                            [(cx, cy - 8), (cx + 7, cy), (cx, cy + 8), (cx - 7, cy)], 2)
+        pygame.draw.line(surface, color, (cx - dx * 5, cy - dy * 5),
+                         (cx + dx * 5, cy + dy * 5), 2)
+        _arrow_head(surface, cx, cy, dx, dy, color)
+    elif symbol in ('▲', '▼', '◀', '▶'):
+        triangles = {
+            '▲': [(cx, cy - 8), (cx - 7, cy + 6), (cx + 7, cy + 6)],
+            '▼': [(cx, cy + 8), (cx - 7, cy - 6), (cx + 7, cy - 6)],
+            '◀': [(cx - 8, cy), (cx + 6, cy - 7), (cx + 6, cy + 7)],
+            '▶': [(cx + 8, cy), (cx - 6, cy - 7), (cx - 6, cy + 7)],
+        }
+        pygame.draw.polygon(surface, color, triangles[symbol])
+    elif symbol == '↕':
+        pygame.draw.line(surface, color, (cx, cy - 5), (cx, cy + 5), 2)
+        _arrow_head(surface, cx, cy, 0, -1, color)
+        _arrow_head(surface, cx, cy, 0, 1, color)
+    elif symbol == '↔':
+        pygame.draw.line(surface, color, (cx - 5, cy), (cx + 5, cy), 2)
+        _arrow_head(surface, cx, cy, -1, 0, color)
+        _arrow_head(surface, cx, cy, 1, 0, color)
     elif symbol in ('☐', '☑'):
         pygame.draw.rect(surface, color, (cx - 7, cy - 7, 14, 14), 2)
         if symbol == '☑':

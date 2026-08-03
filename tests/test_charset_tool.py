@@ -120,12 +120,19 @@ class TestCharsetTool(unittest.TestCase):
             self.assertEqual(data['cols'], 3)
 
     def test_special_glyph_palette(self):
-        """The palette covers the non-typeable glyphs (arrows, triangles,
-        diamonds, checkboxes, radio), and every icon actually draws ink."""
+        """The palette covers exactly the requested non-typeable glyphs
+        (4 cardinal arrows, 4 triangles, vertical/horizontal double
+        arrows, checkboxes, radio), no diagonals or diamonds, and every
+        icon actually draws ink."""
         symbols = [s for s, _ in tool.SPECIAL_GLYPHS]
-        for needed in ('←', '↑', '→', '↓', '▲', '▼', '◆', '◇',
+        self.assertEqual(len(symbols), 14)
+        for needed in ('←', '↑', '→', '↓',
+                       '▲', '▼', '◀', '▶',
+                       '↕', '↔',
                        '☐', '☑', '○', '◉'):
             self.assertIn(needed, symbols)
+        for banned in ('↖', '↗', '↙', '↘', '◆', '◇'):
+            self.assertNotIn(banned, symbols)
         surf = pygame.Surface((24, 24), pygame.SRCALPHA)
         for sym, _ in tool.SPECIAL_GLYPHS:
             surf.fill((0, 0, 0, 0))
