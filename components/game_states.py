@@ -31,3 +31,4 @@ class GameStates(Enum):
 	LEVEL_UP = 7
 	CHARACTER_SCREEN = 8
 	EQUIPMENT_SCREEN = 9
+	VICTORY = 10

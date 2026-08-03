@@ -1,91 +1,71 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-#
-#  inventory.py
-#  
-#  Copyright 2019 Bonzu <bonzupii@protonmail.com>
-#  
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 3 of the License, or
-#  (at your option) any later version.
-#  
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#  
-#  You should have received a copy of the GNU General Public License
-#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#  
-#  
-import tcod as libtcod
+"""Inventory (no libtcod)."""
 
 from components.game_messages import Message
+from renderer import palette as C
+
 
 class Inventory:
-	def __init__(self, capacity):
-		self.capacity = capacity
-		self.items = []
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.items = []
 
-	def add_item(self, item):
-		results = []
+    def add_item(self, item):
+        results = []
+        if len(self.items) >= self.capacity:
+            results.append({
+                'item_added': None,
+                'message': Message('You cannot carry any more, your inventory is full', C.YELLOW)
+            })
+        else:
+            results.append({
+                'item_added': item,
+                'message': Message('You pick up the {0}!'.format(item.name), C.BLUE)
+            })
+            self.items.append(item)
+        return results
 
-		if len(self.items) >= self.capacity:
-			results.append({
-				'item_added': None,
-				'message': Message('You cannot carry any more, your inventory is full', libtcod.yellow)
-			})
-		else:
-			results.append({
-				'item_added': item,
-				'message': Message('You pick up the {0}!'.format(item.name), libtcod.blue)
-			})
+    def use(self, item_entity, **kwargs):
+        results = []
+        item_component = item_entity.item
 
-			self.items.append(item)
+        if item_component.use_function is None:
+            equippable_component = item_entity.equippable
+            if equippable_component:
+                results.append({'equip': item_entity})
+            else:
+                results.append({'message': Message('The {0} cannot be used'.format(item_entity.name), C.YELLOW)})
+        else:
+            if item_component.targeting and not (kwargs.get('target_x') or kwargs.get('target_y')):
+                results.append({'targeting': item_entity})
+            else:
+                kwargs = {**item_component.function_kwargs, **kwargs}
+                item_use_results = item_component.use_function(self.owner, **kwargs)
 
-		return results
+                for item_use_result in item_use_results:
+                    if item_use_result.get('consumed'):
+                        self.remove_item(item_entity)
+                    results.extend(item_use_results)
 
-	def use(self, item_entity, **kwargs):
-		results = []
+        return results
 
-		item_component = item_entity.item
+    def remove_item(self, item):
+        self.items.remove(item)
 
-		if item_component.use_function is None:
-			equippable_component = item_entity.equippable
+    def drop_item(self, item):
+        results = []
+        equipment = self.owner.equipment
+        equipped = (equipment.top_right_tentacle == item or equipment.top_left_tentacle == item or
+                    equipment.bottom_right_tentacle == item or equipment.bottom_left_tentacle == item or
+                    equipment.chest_plate == item or equipment.helmet == item or equipment.neck == item)
+        if equipped:
+            self.owner.equipment.toggle_equip(item)
 
-			if equippable_component:
-				results.append({'equip': item_entity})
-			else:
-				results.append({'message': Message('The {0} cannot be used'.format(item_entity.name), libtcod.yellow)})
-		else:
-			if item_component.targeting and not (kwargs.get('target_x') or kwargs.get('target_y')):
-				results.append({'targeting': item_entity})
-			else:
-				kwargs = {**item_component.function_kwargs, **kwargs}
-				item_use_results = item_component.use_function(self.owner, **kwargs)
+        item.x = self.owner.x
+        item.y = self.owner.y
 
-				for item_use_result in item_use_results:
-					if item_use_result.get('consumed'):
-						self.remove_item(item_entity)
-
-				results.extend(item_use_results)
-
-		return results
-
-	def remove_item(self, item):
-		self.items.remove(item)
-
-	def drop_item(self, item):
-		results = []
-
-		if self.owner.equipment.top_right_tentacle == item or self.owner.equipment.top_left_tentacle == item or self.owner.equipment.bottom_right_tentacle == item or self.owner.equipment.bottom_left_tentacle == item or self.owner.equipment.chest_plate == item or self.owner.equipment.helmet == item or self.owner.equipment.neck == item:
-			self.owner.equipment.toggle_equip(item)
-
-		item.x = self.owner.x
-		item.y = self.owner.y
-
-		self.remove_item(item)
-		results.append({'item_dropped': item, 'message': Message('You dropped the {0}'.format(item.name),
-																 libtcod.yellow)})
-
-		return results
+        self.remove_item(item)
+        results.append({'item_dropped': item,
+                        'message': Message('You dropped the {0}'.format(item.name), C.YELLOW)})
+        return results

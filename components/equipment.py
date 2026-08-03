@@ -135,7 +135,7 @@ class Equipment:
 				results.append({'dequipped': equippable_entity})
 			else:
 				if self.helmet:
-					results.append({'dequipped': self.bottom_left_tentacle})
+					results.append({'dequipped': self.helmet})
 
 				self.helmet = equippable_entity
 				results.append({'equipped': equippable_entity})
@@ -146,7 +146,7 @@ class Equipment:
 				results.append({'dequipped': equippable_entity})
 			else:
 				if self.neck:
-					results.append({'dequipped': self.bottom_left_tentacle})
+					results.append({'dequipped': self.neck})
 
 				self.neck = equippable_entity
 				results.append({'equipped': equippable_entity})

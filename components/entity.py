@@ -15,7 +15,8 @@ class Entity:
     def __init__(self, x, y, sprite_id, color, name, blocks=False,
                  render_order=RenderOrder.CORPSE, fighter=None, ai=None,
                  item=None, inventory=None, trail=None, level=None,
-                 equipment=None, equippable=None, part_id=None, ship=False):
+                 equipment=None, equippable=None, part_id=None, ship=False,
+                 quest=None):
         self.x = x
         self.y = y
         self.sprite_id = sprite_id
@@ -33,6 +34,7 @@ class Entity:
         self.equippable = equippable
         self.part_id = part_id
         self.ship = ship
+        self.quest = quest
 
         if self.fighter:
             self.fighter.owner = self
@@ -54,6 +56,9 @@ class Entity:
                 item = Item()
                 self.item = item
                 self.item.owner = self
+
+        if self.quest:
+            self.quest.owner = self
 
     def move(self, dx, dy):
         self.x += dx
