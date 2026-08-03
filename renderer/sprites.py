@@ -352,12 +352,12 @@ def _sprite_corpse(s, c):
         "..nnnnnnn",
         "..ndnnndn",
         "..nnndnnn",
-        "...ndndn",
-        "..n...n",
-        "...n.n",
-        "....n",
-        "...n.n",
-        "..n...n",
+        "...ddndd",
+        "...n...n",
+        "....n.n",
+        ".....n",
+        "....n.n",
+        "...n...n",
     ], pal, top=2)
 
 
@@ -481,7 +481,7 @@ def _icon_bolt(s, c):
         "...ollbo",
         "..ollbo",
         "..olbo",
-        "..oooooo",
+        "..olllbo",
         "....olbo",
         "...olbo",
         "..olbo",
@@ -619,9 +619,9 @@ def _icon_star(s, c):
         "..ollllllo",
         "...ollllo",
         "..oll..llo",
-        ".oll....llo",
         ".ol......lo",
-        "ol........lo",
+        "...........",
+        "............",
     ], _palette(c), top=1)
 
 

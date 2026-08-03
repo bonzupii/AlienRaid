@@ -232,7 +232,8 @@ class Renderer:
         pygame.draw.rect(frame, C.DARKER_RED, (1 * TILE, (panel_y + 1) * TILE, bar_width * TILE, TILE))
         if fill > 0:
             pygame.draw.rect(frame, C.LIGHT_RED, (1 * TILE, (panel_y + 1) * TILE, fill * TILE, TILE))
-        self.font.draw_text(frame, 'HP: {0}/{1}'.format(hp, max_hp), 2, panel_y + 1, C.WHITE)
+        self.font.draw_text(frame, 'HP: {0}/{1}'.format(hp, max_hp), 2, panel_y + 1,
+                            C.WHITE, vertical_center=True)
 
         self.font.draw_text(frame, 'Dungeon level: {0}'.format(game_map.dungeon_level),
                             1, panel_y + 3, C.LIGHT_GRAY)

@@ -24,6 +24,28 @@ TILE = 12
 DEFAULT_MAP = 'charset_map.json'
 
 _CHAR_MAP_CACHE = None
+_ATLAS_CACHE = {}
+
+
+def _load_atlas(font_path):
+    """Load the bitmap font once and convert its opaque black background to
+    transparency (brightness-to-alpha, the same conversion
+    ``tools/identify_charset.py`` applies). Without this every glyph blits as
+    a black box — invisible on black panels but visible over coloured UI
+    such as the HP bar. Anti-aliased edges keep a smooth alpha falloff."""
+    atlas = _ATLAS_CACHE.get(font_path)
+    if atlas is None:
+        if pygame.display.get_surface() is None:
+            # A display must exist for convert_alpha(); headless runs get a
+            # 1x1 dummy window (SDL_VIDEODRIVER=dummy).
+            pygame.display.set_mode((1, 1))
+        atlas = pygame.image.load(font_path).convert_alpha()
+        for y in range(atlas.get_height()):
+            for x in range(atlas.get_width()):
+                r, g, b, _ = atlas.get_at((x, y))
+                atlas.set_at((x, y), (r, g, b, max(r, g, b)))
+        _ATLAS_CACHE[font_path] = atlas
+    return atlas
 
 
 def get_char_map(path=DEFAULT_MAP):
@@ -60,14 +82,11 @@ class FontRenderer:
                 'Charset map not found: {0}. Generate it with '
                 'tools/identify_charset.py.'.format(map_path))
 
-        if pygame.display.get_surface() is None:
-            # A display must exist for convert_alpha(); headless runs get a
-            # 1x1 dummy window (SDL_VIDEODRIVER=dummy).
-            pygame.display.set_mode((1, 1))
-        atlas = pygame.image.load(font_path).convert_alpha()
+        atlas = _load_atlas(font_path)
         self.cols = atlas.get_width() // tile
         self.char_map = get_char_map(map_path)
-        self._glyphs = {}   # (char, color) -> tinted Surface (cached)
+        self._glyphs = {}          # (char, color) -> tinted Surface (cached)
+        self._ink_rows_cache = {}  # char -> (min_y, max_y) ink rows, or None
         self._atlas = atlas
 
     def cell_for(self, ch):
@@ -98,14 +117,53 @@ class FontRenderer:
         self._glyphs[key] = glyph
         return glyph
 
-    def draw_char(self, surface, code, x, y, color):
-        """Draw a single character at tile position (x, y)."""
+    def _ink_rows(self, ch):
+        """Vertical (min_y, max_y) rows of visible ink for ``ch``, or None
+        for a blank cell (space). Used to vertically centre text drawn over
+        coloured bars."""
+        if ch in self._ink_rows_cache:
+            return self._ink_rows_cache[ch]
+        col, row = self.char_map[ch]
+        rect = pygame.Rect(col * self.tile, row * self.tile, self.tile, self.tile)
+        cell = self._atlas.subsurface(rect)
+        min_y = max_y = None
+        for y in range(self.tile):
+            for x in range(self.tile):
+                if cell.get_at((x, y))[3] > 24:
+                    if min_y is None:
+                        min_y = y
+                    max_y = y
+                    break
+        result = None if min_y is None else (min_y, max_y)
+        self._ink_rows_cache[ch] = result
+        return result
+
+    def draw_char(self, surface, code, x, y, color, y_px_offset=0):
+        """Draw a single character at tile position (x, y), optionally
+        shifted by ``y_px_offset`` pixels (used for vertical centring)."""
         ch = chr(code) if isinstance(code, int) else code
         if ch == ' ':
             return
-        surface.blit(self.glyph(ch, color), (x * self.tile, y * self.tile))
+        surface.blit(self.glyph(ch, color),
+                     (x * self.tile, y * self.tile + y_px_offset))
 
-    def draw_text(self, surface, text, x, y, color):
-        """Draw a string starting at tile position (x, y)."""
-        for i, ch in enumerate(str(text)):
-            self.draw_char(surface, ch, x + i, y, color)
+    def draw_text(self, surface, text, x, y, color, vertical_center=False):
+        """Draw a string starting at tile position (x, y).
+
+        With ``vertical_center=True`` the string's ink block is vertically
+        centred inside its tile row (for text overlaid on coloured bars).
+        """
+        text = str(text)
+        y_px_offset = 0
+        if vertical_center:
+            rows = []
+            for ch in text:
+                r = self._ink_rows(ch)
+                if r is not None:
+                    rows.append(r)
+            if rows:
+                top = min(r[0] for r in rows)
+                bottom = max(r[1] for r in rows)
+                y_px_offset = (self.tile - (bottom - top + 1)) // 2 - top
+        for i, ch in enumerate(text):
+            self.draw_char(surface, ch, x + i, y, color, y_px_offset=y_px_offset)

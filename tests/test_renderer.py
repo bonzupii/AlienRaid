@@ -120,20 +120,52 @@ class TestFontRenderer(unittest.TestCase):
         self.assertNotEqual(pygame.image.tostring(a_surf, 'RGB'),
                             pygame.image.tostring(b_surf, 'RGB'))
 
-    def test_fallback_for_sprite_code(self):
+    def test_glyph_background_is_transparent(self):
+        """Regression: glyphs must not paint a black box. The hand-drawn
+        atlas is opaque black; drawing a letter over a coloured surface must
+        let the background show through (black converted to alpha), or the
+        HP bar text would sit on a black rectangle."""
         font = FontRenderer('alienraid12x12.png')
-        surf = pygame.Surface((12, 12), pygame.SRCALPHA)
-        font.draw_char(surf, 196, 0, 0, WHITE)  # unmapped -> '?' fallback
-        self.assertEqual(_ink_count(surf), _ink_count_for('?'))
-        # shouldn't crash
+        red = (200, 30, 30)
+        surf = pygame.Surface((12, 12))
+        surf.fill(red)
+        font.draw_char(surf, 'A', 0, 0, WHITE)
+        red_visible = any(
+            abs(r - red[0]) <= 30 and abs(g - red[1]) <= 30 and abs(b - red[2]) <= 30
+            for y in range(12) for x in range(12)
+            for r, g, b, *_ in [surf.get_at((x, y))])
+        self.assertTrue(red_visible, 'opaque glyph box covered the background')
 
+    def test_text_vertical_center(self):
+        """Text drawn with vertical_center=True (the HP bar label) has its
+        ink block centred within the 12px tile row."""
+        font = FontRenderer('alienraid12x12.png')
+        surf = pygame.Surface((120, 12), pygame.SRCALPHA)  # wide enough for the whole string
+        surf.fill((0, 0, 0, 255))
+        font.draw_text(surf, 'HP: 100/125', 0, 0, WHITE, vertical_center=True)
+        ys = [y for y in range(12) for x in range(12)
+              if surf.get_at((x, y))[3] > 24]
+        self.assertTrue(ys, 'HP text drew nothing')
+        mid = (min(ys) + max(ys)) / 2.0
+        self.assertLessEqual(abs(mid - (12 - 1) / 2.0), 1.0,
+                             'text ink not vertically centred in the row')
 
-def _ink_count_for(ch):
-    font = FontRenderer('alienraid12x12.png')
-    surf = pygame.Surface((12, 12), pygame.SRCALPHA)
-    surf.fill((0, 0, 0))
-    font.draw_char(surf, ch, 0, 0, WHITE)
-    return _ink_count(surf)
+    def test_fallback_for_sprite_code(self):
+        """An unmapped code falls back to '?' and paints exactly the same
+        pixels as drawing '?' directly (on identical backgrounds).
+
+        (Previously this compared a transparent-background blit against a
+        black-filled blit; now that the atlas is alpha-correct, anti-aliased
+        edge pixels legitimately blend differently over opaque black, so the
+        comparison must use the same background.)"""
+        font = FontRenderer('alienraid12x12.png')
+        a = pygame.Surface((12, 12), pygame.SRCALPHA)
+        b = pygame.Surface((12, 12), pygame.SRCALPHA)
+        font.draw_char(a, 196, 0, 0, WHITE)  # unmapped -> '?' fallback
+        font.draw_char(b, '?', 0, 0, WHITE)
+        self.assertEqual(pygame.image.tostring(a, 'RGBA'),
+                         pygame.image.tostring(b, 'RGBA'))
+        self.assertGreater(_ink_count(a), 0, 'fallback glyph drew nothing')
 
 
 class TestSpriteLoader(unittest.TestCase):

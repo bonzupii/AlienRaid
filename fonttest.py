@@ -3,7 +3,7 @@ import tcod as libtcod
 #
 #  fonttest.py
 #  
-#  Copyright 2019 Bonzu <bonzupii@protonmail.com>
+#  Copyright 2019-2026 Bonzupii <bonzupii@protonmail.com>
 #  
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@ import tcod as libtcod
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #  
 # 
-print("AlienRaid Copyright (C) 2019  Bonzu <bonzupii@protonmail.com>\nThis program comes with ABSOLUTELY NO WARRANTY.\nThis is free software, and you are welcome to redistribute it under\ncertain conditions.\nSee enclosed LICENSE.md for details.")
+print("AlienRaid Copyright (C) 2019-2026  Bonzupii <bonzupii@protonmail.com>\nThis program comes with ABSOLUTELY NO WARRANTY.\nThis is free software, and you are welcome to redistribute it under\ncertain conditions.\nSee enclosed LICENSE.md for details.")
 print("\nA file for developers to use to test and keep track of icons in the fontmap.\n")
 def main():
 	screen_width = 5

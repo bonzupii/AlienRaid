@@ -92,7 +92,7 @@ def main_menu(surface, font, background_image, screen_width, screen_height):
 
     font.draw_text(surface, 'ALIEN RAID',
                    int(screen_width / 2 - 5), int(screen_height / 2 - 6), C.LIGHT_GREEN)
-    font.draw_text(surface, '(C) 2019 By Bonzu Pippinpaddlopsikopolis III <bonzupii@protonmail.com>',
+    font.draw_text(surface, '(C) 2019-2026 By Bonzupii <bonzupii@protonmail.com>',
                    int(screen_width / 2 - 36), screen_height - 2, C.LIGHT_GRAY)
     font.draw_text(surface, 'Please see the README.md file to learn about game controls.',
                    int(screen_width / 2 - 30), screen_height - 4, C.LIGHT_GRAY)

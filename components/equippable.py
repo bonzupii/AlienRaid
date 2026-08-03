@@ -2,7 +2,7 @@
 #
 #  equippable.py
 #  
-#  Copyright 2019 Bonzu <bonzupii@protonmail.com>
+#  Copyright 2019-2026 Bonzupii <bonzupii@protonmail.com>
 #  
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by

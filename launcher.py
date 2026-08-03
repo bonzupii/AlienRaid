@@ -28,7 +28,7 @@ from renderer.renderer import Renderer
 from renderer import palette as C
 from functions.systems import passive_regen, wait_action, process_player_turn_results
 
-print("AlienRaid Copyright (C) 2019  Bonzu <bonzupii@protonmail.com>\n"
+print("AlienRaid Copyright (C) 2019-2026  Bonzupii <bonzupii@protonmail.com>\n"
       "This program comes with ABSOLUTELY NO WARRANTY.\n"
       "This is free software, and you are welcome to redistribute it under\n"
       "certain conditions.\n"
