@@ -30,6 +30,7 @@ import random
 import pygame
 
 from components.game_states import GameStates
+from components.fighter import HUNGER_MAX, HUNGER_LABELS, hunger_tier
 from components import menus
 from functions.render_order import RenderOrder  # noqa: F401
 from functions.render_functions import get_names_under_mouse
@@ -323,7 +324,8 @@ class Renderer:
     # ------------------------------------------------------------- HUD panel
     def _ensure_panel_bg(self):
         """Build the console background once: a warm red-dirt gradient with
-        speckle noise, a bezel top edge and the bar divider column."""
+        speckle noise, a bezel top edge (with rivets) and the bar/log
+        divider column."""
         if self._panel_bg is not None:
             return
         w = self.screen_w
@@ -350,30 +352,74 @@ class Renderer:
             bg.set_at((x, y), (max(0, min(255, r + delta)),
                                max(0, min(255, g + delta)),
                                max(0, min(255, b + delta))))
-        # Bezel: light top edge with a dark seam under it.
+        # Bezel: light top edge with a dark seam under it, plus rivets.
         pygame.draw.line(bg, (60, 44, 32), (0, 0), (w, 0))
         pygame.draw.line(bg, (28, 19, 15), (0, 1), (w, 1))
-        # The bar/log divider column.
-        pygame.draw.line(bg, (36, 25, 20), (self.constants['bar_width'] * UI_TILE, 0),
-                         (self.constants['bar_width'] * UI_TILE, h))
+        for fx in (w // 8, 3 * w // 8, 5 * w // 8, 7 * w // 8):
+            pygame.draw.rect(bg, (74, 56, 42), (fx - 1, 3, 2, 2))
+            pygame.draw.rect(bg, (32, 22, 17), (fx, 4, 1, 1))
+        # The bar/log divider column: dark seam with a bright edge.
+        dx = self.constants['bar_width'] * UI_TILE
+        pygame.draw.line(bg, (24, 17, 13), (dx, 0), (dx, h))
+        pygame.draw.line(bg, (56, 42, 33), (dx + 1, 0), (dx + 1, h))
         self._panel_bg = bg
 
     def _hud_bar(self, frame, tile_x, py, width, ratio, dark, bright, label):
-        """A recessed HUD bar: dark slot, rim, gloss-topped fill, label."""
+        """A recessed HUD meter: dark slot, rim, vertical-gradient fill
+        with a gloss line, segment ticks and an end cap."""
         x0 = tile_x * UI_TILE
-        slot = pygame.Rect(x0, py, width * UI_TILE, UI_TILE)
-        pygame.draw.rect(frame, (12, 10, 10), slot)
-        pygame.draw.rect(frame, (66, 52, 44), slot, 1)
-        fill_w = int(width * UI_TILE * max(0.0, min(1.0, ratio)))
+        w = width * UI_TILE
+        slot = pygame.Rect(x0, py, w, UI_TILE)
+        pygame.draw.rect(frame, (10, 8, 8), slot)
+        pygame.draw.rect(frame, (58, 46, 38), slot, 1)
+        pygame.draw.line(frame, (0, 0, 0), (x0 + 1, py + UI_TILE - 2),
+                         (x0 + w - 2, py + UI_TILE - 2))
+        fill_w = int(w * max(0.0, min(1.0, ratio)))
         if fill_w > 0:
             fill = pygame.Rect(x0 + 1, py + 1, fill_w - 1, UI_TILE - 2)
-            pygame.draw.rect(frame, dark, fill)
-            bright_h = max(1, int(fill.h * 0.6))
-            pygame.draw.rect(frame, bright, (fill.x, fill.y, fill.w, bright_h))
-            pygame.draw.rect(frame, C.shade(bright, 1.35),
-                             (fill.x, fill.y, fill.w, 1))
-        self.font.draw_text(frame, label, tile_x + 1, py // UI_TILE, C.WHITE,
-                            vertical_center=True)
+            for fy in range(fill.h):
+                f = fy / max(1, fill.h - 1)
+                col = tuple(int(dark[i] + (bright[i] - dark[i]) * (1 - f) * 0.7)
+                            for i in range(3))
+                pygame.draw.line(frame, col, (fill.x, fill.y + fy),
+                                 (fill.x + fill.w - 1, fill.y + fy))
+            pygame.draw.line(frame, C.shade(bright, 1.3),
+                             (fill.x, fill.y), (fill.x + fill.w - 1, fill.y))
+            pygame.draw.line(frame, C.shade(dark, 1.25),
+                             (fill.x + fill.w - 1, fill.y),
+                             (fill.x + fill.w - 1, fill.y + fill.h - 1))
+            for tx in range(x0 + 5, x0 + w - 2, 6):
+                pygame.draw.line(frame, (0, 0, 0), (tx, py + 2),
+                                 (tx, py + UI_TILE - 3))
+        self.font.draw_text(frame, label, tile_x + 1, py // UI_TILE,
+                            C.WHITE, vertical_center=True)
+
+    _STATUS_BADGES = {
+        'webbed': (C.WHITE, 'WEB'),
+        'speed': (C.GOLD, 'SPD'),
+        'invisible': (C.LIGHT_BLUE, 'INV'),
+        'poison_resist': (C.LIGHT_GREEN, 'RES'),
+    }
+
+    def _draw_status_row(self, frame, py, bar_width, statuses):
+        """Row 6: coloured badges for active effects, or the compact key
+        hint when nothing is active. Badges never overflow the column."""
+        if not statuses:
+            self.font.draw_text(frame, 'z wait g grab . use i inv',
+                                1, py // UI_TILE, C.DARK_GRAY)
+            return
+        tx = 1
+        for key in sorted(statuses):
+            color, label = self._STATUS_BADGES.get(
+                key, (C.LIGHT_GRAY, key.upper()[:3]))
+            if tx + 1 + len(label) > bar_width:
+                break
+            sx = tx * UI_TILE
+            pygame.draw.rect(frame, color, (sx + 1, py + 3, 6, 10))
+            pygame.draw.rect(frame, C.shade(color, 0.55),
+                             (sx + 1, py + 3, 6, 10), 1)
+            self.font.draw_text(frame, label, tx + 1, py // UI_TILE, C.WHITE)
+            tx += 1 + len(label)
 
     def _draw_panel(self, game_map, entities, player, message_log, fov, mouse_tile):
         map_px = self.constants['map_height'] * MAP_TILE   # panel pixel origin
@@ -385,56 +431,85 @@ class Renderer:
         def row_y(r):
             return map_px + r * UI_TILE
 
-        # Row 0: names (clamped) + dungeon level, split by the divider.
+        # ------------------------------------------------ left column
+        # Row 0: names under the mouse (clamped to the column).
         names = ''
         if mouse_tile is not None:
             names = get_names_under_mouse(mouse_tile, entities, fov, game_map)
         max_names = bar_width - 2
         if len(names) > max_names:
             names = names[:max_names - 3] + '...'
-        if getattr(game_map, 'is_pocket', False):
-            level_text = 'Dungeon level: 4.5'
-        else:
-            level_text = 'Dungeon level: {0}'.format(game_map.dungeon_level)
         self.font.draw_text(frame, names, 1, row_y(0) // UI_TILE, C.LIGHT_GRAY)
-        self.font.draw_text(frame, level_text, bar_width + 2, row_y(0) // UI_TILE,
-                            C.LIGHT_GRAY)
 
-        # Rows 1-2: HP / XP bars (left column).
+        # Rows 1-2: HP / XP meters.
         hp = player.fighter.hp
         max_hp = max(1, player.fighter.max_hp)
         self._hud_bar(frame, 1, row_y(1), bar_width, hp / max_hp,
                       C.DARKER_RED, C.LIGHT_RED,
-                      'HP: {0}/{1}'.format(hp, max_hp))
+                      'HP {0}/{1}'.format(hp, max_hp))
         xp = player.level.current_xp
         xp_next = max(1, player.level.experience_to_next_level)
         self._hud_bar(frame, 2, row_y(2), bar_width, min(1.0, xp / xp_next),
                       C.DARK_BLUE, C.LIGHT_BLUE,
-                      'XP: {0}/{1}  Lv {2}'.format(xp, xp_next, player.level.current_level))
+                      'XP {0}/{1}  Lv {2}'.format(xp, xp_next,
+                                                  player.level.current_level))
 
-        # Rows 3-5: quest panel (ship parts + part checkboxes).
+        # Row 3: hunger meter (satiety drains; colour shifts with the tier).
         pygame.draw.line(frame, (36, 25, 20), (0, row_y(3) - 2),
                          (bar_width * UI_TILE, row_y(3) - 2))
-        self.font.draw_text(frame, 'Ship parts: {0}/{1}'.format(
-            player.quest.found_count, player.quest.parts_total),
-            1, row_y(3) // UI_TILE, C.GOLD)
+        hunger = getattr(player.fighter, 'hunger', HUNGER_MAX)
+        tier = hunger_tier(player.fighter)
+        if tier == 'starving':
+            h_fill, h_bright = C.DARKER_RED, C.LIGHT_RED
+        elif tier == 'hungry':
+            h_fill, h_bright = (92, 58, 16), (235, 175, 70)
+        else:
+            h_fill, h_bright = C.DARKER_GREEN, C.LIGHT_GREEN
+        self._hud_bar(frame, 3, row_y(3), bar_width,
+                      max(0.0, min(1.0, hunger / HUNGER_MAX)),
+                      h_fill, h_bright,
+                      'Hunger: {0}'.format(HUNGER_LABELS[tier]))
+
+        # Rows 4-5: ship parts -- gold header with a mini progress meter,
+        # then all four part checkboxes on a single line.
+        pygame.draw.line(frame, (36, 25, 20), (0, row_y(4) - 2),
+                         (bar_width * UI_TILE, row_y(4) - 2))
+        parts = player.quest.found_count
+        parts_total = player.quest.parts_total
+        self.font.draw_text(frame, 'Ship parts: {0}/{1}'.format(parts, parts_total),
+                            1, row_y(4) // UI_TILE, C.GOLD)
+        px0 = 1 * UI_TILE
+        pmax = (bar_width - 2) * UI_TILE
+        # 1px meter along the row's very bottom edge, clear of the glyph
+        # ink (Font16 ink ends at +14), so it never collides with the text.
+        pygame.draw.rect(frame, (12, 10, 10), (px0, row_y(4) + 15, pmax, 1))
+        pygame.draw.rect(frame, (205, 165, 60),
+                         (px0, row_y(4) + 15,
+                          max(0, int(pmax * parts / max(1, parts_total))), 1))
         from components.quest import SHIP_PARTS
         short = {'antimatter_core': 'Core', 'nav_computer': 'Nav',
-                 'power_coupling': 'Coupling', 'hull_plating': 'Plating'}
-        ids = list(SHIP_PARTS)
-        for r, pair in enumerate((ids[0:2], ids[2:4])):
-            line = '  '.join(
-                ('☑' if player.quest.has_part(pid) else '☐') + ' ' + short[pid]
-                for pid in pair)
-            self.font.draw_text(frame, line, 1, row_y(4 + r) // UI_TILE, C.LIGHT_GRAY)
+                 'power_coupling': 'Coup', 'hull_plating': 'Plat'}
+        line = ' '.join(
+            ('☑' if player.quest.has_part(pid) else '☐') + ' ' + short[pid]
+            for pid in SHIP_PARTS)
+        self.font.draw_text(frame, line, 1, row_y(5) // UI_TILE, C.LIGHT_GRAY)
         pygame.draw.line(frame, (36, 25, 20), (0, row_y(6) - 2),
                          (bar_width * UI_TILE, row_y(6) - 2))
 
-        # Row 6: controls hint.
-        self.font.draw_text(frame, 'z wait  g grab  . use  i inv  d drop  c char  r craft',
-                            1, row_y(6) // UI_TILE, C.DARK_GRAY)
+        # Row 6: active status badges, or the compact key hint when clear.
+        self._draw_status_row(frame, row_y(6), bar_width,
+                              getattr(player.fighter, 'status', {}) or {})
 
-        # Right column: framed message-log pane (rows 1-6).
+        # ------------------------------------------------ right column
+        # Row 0: dungeon level readout.
+        if getattr(game_map, 'is_pocket', False):
+            level_text = 'DUNGEON LV 4.5'
+        else:
+            level_text = 'DUNGEON LV {0}'.format(game_map.dungeon_level)
+        self.font.draw_text(frame, level_text, self.constants['message_x'],
+                            row_y(0) // UI_TILE, C.LIGHT_GRAY)
+
+        # Rows 1-6: framed message-log pane.
         log_x0 = (bar_width + 1) * UI_TILE
         log_x1 = self.screen_w - UI_TILE
         log_top = row_y(1)

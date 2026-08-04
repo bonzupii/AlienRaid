@@ -98,5 +98,46 @@ class TestClickRegistry(unittest.TestCase):
         self.assertIsNone(menus.action_at((500, 500)))
 
 
+class TestMenuSizingAndGroupedHotkeys(unittest.TestCase):
+    def test_menu_box_sizes_to_content_never_truncates(self):
+        """The box must grow to hold the longest option -- options are
+        never wrapped and never elided with '...'."""
+        surface = pygame.Surface((1600, 852))
+        font = FontRenderer()
+        long_option = ('Craft Med Kit (needs: 2 x Lesser Med Kit, 1 x '
+                       'Eucalyptus Tea) - shown in full')
+        m = menus.Menu('Crafting.', [long_option], width=5)
+        _x, _y, w, h = m.draw(surface, font)
+        full = '(a) ' + long_option
+        # The box widened itself far past the caller's requested width so
+        # the whole option fits on one line -- no truncation, no wrapping.
+        self.assertGreaterEqual(w, len(full) + 3)
+        self.assertEqual(h, 1 + 1 + 2)  # header row + 1 option + box padding
+        self.assertNotIn('...', full)
+
+    def test_grouped_hotkeys_collapse_stacks(self):
+        """Stacks collapse to ONE hotkey and the letter resolves to the
+        top item of its stack -- never a raw list position behind a stack
+        (the bug where stacked items ate multiple hotkeys)."""
+        player = Entity(0, 0, 'player', (0, 0, 0), 'P',
+                        fighter=Fighter(100, 10, 10),
+                        inventory=Inventory(26), equipment=Equipment())
+        player.inventory.add_item(create_item('lesser_med_kit', 1, 0, 0))
+        player.inventory.add_item(create_item('lesser_med_kit', 1, 0, 0))
+        player.inventory.add_item(create_item('med_kit', 1, 0, 0))
+        # Raw list: [lesser(0), lesser(1), med(2)] -> groups: lesser(a,
+        # rep 0), med(b, rep 2). 'b' must hit the med kit at RAW index 2,
+        # not the second lesser kit at raw index 1.
+        groups = menus.inventory_groups(player.inventory.items)
+        self.assertEqual(len(groups), 2)
+        self.assertEqual(groups[0][1], 0)   # lesser stack reps index 0
+        self.assertEqual(groups[1][1], 2)   # med kit reps index 2
+        self.assertIs(menus.inventory_item_at(player, 0),
+                      player.inventory.items[0])
+        self.assertIs(menus.inventory_item_at(player, 1),
+                      player.inventory.items[2])
+        self.assertIsNone(menus.inventory_item_at(player, 99))
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -5,8 +5,15 @@
 from random import randint
 
 from components.ai import StunnedMonster, DingoAI, FLEE
+from components.fighter import HUNGER_MAX
 from components.game_messages import Message
 from renderer import palette as C
+
+
+def _feed(entity, amount):
+    """Food satisfies hunger; medicine never does (Qwen balance rule)."""
+    fighter = entity.fighter
+    fighter.hunger = min(HUNGER_MAX, getattr(fighter, 'hunger', HUNGER_MAX) + amount)
 
 
 def _in_fov(fov_map, game_map, x, y):
@@ -25,17 +32,36 @@ def heal(entity, amount=200, entities=None, fov_map=None, game_map=None, noise_m
     return results
 
 
-def morphine_pack(entity, amount=350, entities=None, fov_map=None, game_map=None, noise_map=None):
+def morphine_pack(entity, amount=350, entities=None, fov_map=None, game_map=None,
+                  noise_map=None, is_morphine=False):
     results = []
     if entity.fighter.hp == entity.fighter.max_hp:
         results.append({'consumed': False, 'message': Message('You are already at full health', C.YELLOW)})
     else:
+        healed_hp = min(amount, entity.fighter.max_hp - entity.fighter.hp)
         entity.fighter.heal(amount)
         results.append({'consumed': True, 'message': Message('Your wounds start to feel much better!', C.GREEN)})
+
+        # Easter egg: only the real Morphine Pack carries the disclaimer --
+        # the Med Kit shares this function and must stay silent (a bandage
+        # kit isn't going to make the nervous-system gag land). One-shot.
+        if is_morphine and not getattr(entity, 'morphine_used', False):
+            entity.morphine_used = True
+            disclaimer_text = (
+                "Yeah, yeah. I know. We have no reason to believe that aliens "
+                "have any biological similarity to human beings whatsoever, or "
+                "that morphine would have any kind of similar effect on "
+                "Wrpgnyth as it does to us. In any case, it heals you for "
+                "{0} HP. Just... OK? Go with it.".format(healed_hp)
+            )
+            results.append({'message': Message(disclaimer_text, C.LIGHT_VIOLET)})
+
     return results
 
 
 def gain_xp(entity, amount=400, entities=None, fov_map=None, game_map=None, noise_map=None):
+    """Bush tucker: XP + it feeds you (food, not medicine)."""
+    _feed(entity, 200)
     return [{'consumed': True, 'xp': amount,
              'message': Message('You scarf down the bush tucker. (gained {0} XP)'.format(amount), C.GREEN)}]
 
@@ -267,9 +293,10 @@ def use_ray_gun(entity, entities=None, fov_map=None, game_map=None, damage=80, m
 
 
 def eat_emu_egg(entity, amount=550, entities=None, fov_map=None, game_map=None, noise_map=None):
-    """Emu egg: heal + a temporary speed boost."""
+    """Emu egg: food + heal + a temporary speed boost."""
     results = []
     entity.fighter.heal(amount)
+    _feed(entity, 250)
     entity.fighter.add_status('speed', 10)
     results.append({'consumed': True,
                     'message': Message('You eat the emu egg. (speed +10 turns)', C.GREEN)})
@@ -277,9 +304,10 @@ def eat_emu_egg(entity, amount=550, entities=None, fov_map=None, game_map=None, 
 
 
 def eat_taipan_meat(entity, amount=300, entities=None, fov_map=None, game_map=None, noise_map=None):
-    """Taipan meat: heal + temporary poison resistance."""
+    """Taipan meat: food + heal + temporary poison resistance."""
     results = []
     entity.fighter.heal(amount)
+    _feed(entity, 180)
     entity.fighter.add_status('poison_resist', 20)
     results.append({'consumed': True,
                     'message': Message('You eat the taipan meat. (poison resistance +20 turns)', C.GREEN)})
@@ -287,11 +315,12 @@ def eat_taipan_meat(entity, amount=300, entities=None, fov_map=None, game_map=No
 
 
 def eat_dropbear_meat(entity, amount=400, entities=None, fov_map=None, game_map=None, noise_map=None):
-    """Dropbear meat: heal + brief invisibility, but it draws attention.
-    The scent is a REAL noise event: dropbears (HEARING 12) path toward
-    the player, fulfilling the flavour text mechanically."""
+    """Dropbear meat: food + heal + brief invisibility, but it draws
+    attention. The scent is a REAL noise event: dropbears (HEARING 12)
+    path toward the player, fulfilling the flavour text mechanically."""
     results = []
     entity.fighter.heal(amount)
+    _feed(entity, 220)
     entity.fighter.add_status('invisible', 15)
     if noise_map:
         noise_map.emit(entity.x, entity.y, 12, 'dropbear_scent')
@@ -355,6 +384,7 @@ def eat_vegemite(entity, amount=150, entities=None, fov_map=None, game_map=None,
     triggers."""
     results = []
     entity.fighter.heal(amount)
+    _feed(entity, 150)
 
     # Track total lifetime vegemite consumption for the escalating bit below.
     entity.vegemite_count = getattr(entity, 'vegemite_count', 0) + 1

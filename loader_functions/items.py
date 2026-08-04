@@ -70,7 +70,7 @@ ITEM_DEFS = {
     # consumables ------------------------------------------------------------
     'lesser_med_kit':      ('icon_cross', C.VIOLET, 'consume', {'use_function': heal, 'amount': 200}),
     'med_kit':             ('icon_cross', C.MEDKIT_RED, 'consume', {'use_function': morphine_pack, 'amount': 500}),
-    'morphine_pack':       ('icon_bottle', C.MORPHINE_BROWN, 'consume', {'use_function': morphine_pack, 'amount': 350}),
+    'morphine_pack':       ('icon_bottle', C.MORPHINE_BROWN, 'consume', {'use_function': morphine_pack, 'amount': 350, 'is_morphine': True}),
     'golden_wattle_salve': ('icon_bottle', C.GOLD, 'consume', {'use_function': heal, 'amount': 800}),
     'vegemite_ration':     ('icon_ration', C.DARK_YELLOW, 'consume', {'use_function': eat_vegemite, 'amount': 150}),
     'bush_tucker':         ('icon_star', C.LIGHT_GREEN, 'consume', {'use_function': gain_xp, 'amount': 400}),

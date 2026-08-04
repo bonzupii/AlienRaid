@@ -41,7 +41,9 @@ def convert(path):
     reloaded = pygame.image.load(tmp)
     if pygame.image.tostring(reloaded.convert_alpha(), 'RGBA') != pixels:
         raise SystemExit('pixel mismatch (left at {0}): {1}'.format(tmp, path))
-    if b'iCCP' in open(tmp, 'rb').read():
+    with open(tmp, 'rb') as f:
+        has_iccp = b'iCCP' in f.read()
+    if has_iccp:
         raise SystemExit('iCCP chunk still present (left at {0}): {1}'.format(tmp, path))
     os.replace(tmp, path)
 

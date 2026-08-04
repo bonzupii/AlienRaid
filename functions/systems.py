@@ -9,6 +9,7 @@ rules testable.
 
 from random import randint
 
+from components.fighter import HUNGER_MAX, hunger_tier
 from components.game_messages import Message
 from components.game_states import GameStates
 from functions.death_functions import kill_monster, kill_player
@@ -23,19 +24,59 @@ def _wearing(player, choice):
 
 def passive_regen(player, message_log):
     """Small chance to slowly regenerate a bit of HP while moving. Ned
-    Kelly's breastplate is too heavy to move-and-heal in."""
+    Kelly's breastplate is too heavy to move-and-heal in, and hunger
+    stops regeneration entirely (Qwen balance pass: slower rate too --
+    1/40 proc, max_hp/300 step)."""
     if _wearing(player, 'ned_kelly_breastplate'):
         return
-    if randint(0, 20) != 20:
+    if hunger_tier(player.fighter) != 'well-fed':
+        return
+    if randint(0, 39) != 39:
         return
     if player.fighter.hp >= player.fighter.max_hp:
         return
-    step = max(1, round(player.fighter.max_hp / 150))
+    step = max(1, round(player.fighter.max_hp / 300))
     if player.fighter.hp >= player.fighter.max_hp - step:
         player.fighter.hp = player.fighter.max_hp
         message_log.add_message(Message('Your wounds are completely healed!', C.GREEN))
     else:
         player.fighter.hp += step
+
+
+def speed_free_action(player):
+    """While the speed boost is active, every second player action is a
+    FREE action: the enemy turn (and all timers) are skipped, mirroring
+    the monsters' SLOW parity pattern. Returns True when the turn should
+    skip the enemy phase."""
+    if not player.fighter.has_status('speed'):
+        return False
+    player._speed_tick = getattr(player, '_speed_tick', 0) + 1
+    return player._speed_tick % 2 == 0
+
+
+def tick_hunger(player, message_log):
+    """Advance the hunger clock one completed player action. Hungry stops
+    regeneration (see passive_regen/wait_action); starving drains a little
+    HP every tick through the normal death path. Returns True if the
+    player starved to death this tick (the caller should go PLAYER_DEAD)."""
+    hunger = getattr(player.fighter, 'hunger', HUNGER_MAX)
+    prev_tier = hunger_tier(player.fighter)
+    player.fighter.hunger = max(0, hunger - 1)
+    tier = hunger_tier(player.fighter)
+    if tier != prev_tier:
+        if tier == 'hungry':
+            message_log.add_message(Message(
+                'You are getting hungry. Regeneration falters.', C.YELLOW))
+        elif tier == 'starving':
+            message_log.add_message(Message(
+                'You are starving! Find food, Wrpgnyth.', C.RED))
+    if tier == 'starving':
+        player.fighter.hp -= max(1, player.fighter.max_hp // 300)
+        if player.fighter.hp <= 0:
+            message, state = kill_player(player)
+            message_log.add_message(message)
+            return True
+    return False
 
 
 def wait_action(player, message_log, wait_timer):
@@ -50,6 +91,12 @@ def wait_action(player, message_log, wait_timer):
         wait_timer = min(wait_timer, 55)
     if wait_timer <= 55:
         wait_timer += 5
+        # Hungry players can still rest (the dropbear ambush stays priced)
+        # but recover nothing -- hunger gates out-of-combat healing.
+        if hunger_tier(player.fighter) != 'well-fed':
+            message_log.add_message(Message(
+                'You are too hungry to rest and recover.', C.YELLOW))
+            return wait_timer, GameStates.ENEMY_TURN
         if player.fighter.hp < player.fighter.max_hp:
             divisor = 100 if _wearing(player, 'ned_kelly_breastplate') else 50
             step = max(1, round(player.fighter.max_hp / divisor))

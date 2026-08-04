@@ -115,7 +115,8 @@ class TestAtlasToCode(unittest.TestCase):
         out = os.path.join(self.tmp.name, 'atlas_font.py')
         TOOL.emit_module(out, vectors, char_map, sprites, empties,
                          'atlas.png', ascii_art=True)
-        text = open(out).read()
+        with open(out) as f:
+            text = f.read()
         self.assertIn('IGNORED_SPRITE_CELLS = [\'2_0\']', text)
         self.assertIn('IGNORED_EMPTY_CELLS = [\'0_0\']', text)
         self.assertIn('GLYPH_VECTORS = {', text)

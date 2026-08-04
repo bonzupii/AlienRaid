@@ -4,6 +4,24 @@
 from components.game_messages import Message
 from renderer import palette as C
 
+# Hunger clock (Qwen's roguelike-balance pass): the counter ticks down one
+# per player action. Generous thresholds; food feeds, medicine never does.
+HUNGER_MAX = 600       # starts full; a ration restores a chunk of this
+HUNGRY_AT = 300        # at/below: passive regen and rest-healing stop
+STARVING_AT = 120      # at/below: small HP drain each turn, can kill
+HUNGER_LABELS = {'well-fed': 'well fed', 'hungry': 'hungry',
+                 'starving': 'STARVING'}
+
+
+def hunger_tier(fighter):
+    """'well-fed' / 'hungry' / 'starving' from a fighter's hunger counter."""
+    h = getattr(fighter, 'hunger', HUNGER_MAX)
+    if h <= STARVING_AT:
+        return 'starving'
+    if h <= HUNGRY_AT:
+        return 'hungry'
+    return 'well-fed'
+
 
 class Fighter:
     def __init__(self, hp, defense, power, xp=0, thorns=0, base_defense_bonus=0):
@@ -17,6 +35,8 @@ class Fighter:
         self.status = {}  # 'webbed': n, 'speed': n, 'invisible': n, ...
         # Easter-egg bookkeeping (getattr-guarded at use sites for old saves).
         self.acquired_taste = False   # 3 vegemite rations: dropbears respect you
+        # Hunger clock (getattr-guarded at read sites for old saves).
+        self.hunger = HUNGER_MAX
 
     @property
     def max_hp(self):

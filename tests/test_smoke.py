@@ -7,9 +7,9 @@ sprite must be painted at the player's tile, the HP bar must be drawn, the
 message log must render text, and the rendered picture must change as the
 game runs.
 
-v4 layout: the map grid is 16px (MAP_TILE), the UI grid is 12px (UI_TILE),
-and the bottom panel lives on the UI grid below the map (panel pixel origin
-= map_height * MAP_TILE).
+v4 layout: the map grid is 16px (MAP_TILE) and the UI grid is 16px
+(UI_TILE); the bottom panel lives on the UI grid below the map (panel
+pixel origin = map_height * MAP_TILE).
 """
 import os
 import sys
@@ -144,6 +144,15 @@ class TestBoot(unittest.TestCase):
                                constants['bar_width'] * UI_TILE, UI_TILE),
                               C.LIGHT_RED),
             'HP bar not painted in the panel')
+
+        # Content assertion: the hunger meter is drawn (a fresh game is
+        # well-fed, so the meter reads green).
+        self.assertTrue(
+            _region_has_color(renderer.frame,
+                              (3 * UI_TILE, panel_px + 3 * UI_TILE,
+                               constants['bar_width'] * UI_TILE, UI_TILE),
+                              C.LIGHT_GREEN),
+            'hunger meter not painted in the panel')
 
         # Content assertion: the welcome message renders as text in the log.
         log_x = constants['message_x'] * UI_TILE

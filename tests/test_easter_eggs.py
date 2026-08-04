@@ -267,9 +267,11 @@ class TestPocketFloor(unittest.TestCase):
     def test_pocket_floor_round_trip(self):
         player = make_player()
         gm = GameMap(100, 48, dungeon_level=5)
-        gm.make_map(100, 48, player, [player])
+        entities = [player]
+        gm.make_map(100, 48, player, entities)
         log = MessageLog(32, 66, 6)
-        entities = gm.go_down(player, log, CONSTANTS, floor=POCKET_FLOOR)
+        entities = gm.go_down(player, log, CONSTANTS, entities,
+                              floor=POCKET_FLOOR)
         self.assertTrue(gm.is_pocket)
         self.assertEqual((gm.width, gm.height), (24, 18))
         mugs = [e for e in entities if getattr(e, 'item_choice', None) == 'dev_mug']
@@ -278,7 +280,7 @@ class TestPocketFloor(unittest.TestCase):
         self.assertEqual(len(ups), 1)
         self.assertEqual(ups[0].trail.floor, 5)
         player.x, player.y = ups[0].x, ups[0].y
-        entities = gm.go_up(player, log, CONSTANTS, floor=5)
+        entities = gm.go_up(player, log, CONSTANTS, entities, floor=5)
         self.assertFalse(gm.is_pocket)
         self.assertEqual(gm.dungeon_level, 5)
         self.assertEqual((gm.width, gm.height), (100, 48))

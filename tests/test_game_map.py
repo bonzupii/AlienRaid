@@ -91,6 +91,50 @@ class TestGameMap(unittest.TestCase):
         self.assertEqual(len(up), 0)
         self.assertEqual(len(ships), 1)
 
+    def test_ship_never_overlaps_other_entities(self):
+        """The crashed ship must always spawn on an EMPTY tile -- in
+        particular it must never land on the down-trail (a non-blocking
+        entity that an 'only blocking entities' placement search used to
+        miss, stacking the ship on top of the trail)."""
+        for _ in range(15):
+            player = make_player()
+            entities = [player]
+            gm = GameMap(100, 48, dungeon_level=1)
+            gm.make_map(100, 48, player, entities)
+            ships = [e for e in entities if e.ship]
+            self.assertEqual(len(ships), 1)
+            ship = ships[0]
+            for other in entities:
+                if other is ship:
+                    continue
+                self.assertNotEqual((other.x, other.y), (ship.x, ship.y),
+                                    'ship overlaps {0}'.format(other.name))
+            # The ship is on walkable ground and reachable from the player.
+            self.assertFalse(gm.is_blocked(ship.x, ship.y))
+            seen = self._flood(gm, player.x, player.y)
+            self.assertTrue(seen[gm.idx(ship.x, ship.y)],
+                            'ship unreachable from the player')
+
+    def test_no_entity_ever_shares_a_tile(self):
+        """Property: on every generated floor, no two entities share a
+        tile -- the crashed ship, trails, parts, NPCs and landmarks must
+        all land on EMPTY tiles. Pins the whole overlap class in one
+        place (the shared _find_free_tile helper)."""
+        for floor in (1, 5, 7, 11, 12, 13, 20):
+            for _ in range(3):
+                player = make_player()
+                entities = [player]
+                gm = GameMap(100, 48, dungeon_level=floor)
+                gm.make_map(100, 48, player, entities)
+                seen = {}
+                for e in entities:
+                    key = (e.x, e.y)
+                    self.assertNotIn(
+                        key, seen,
+                        '{0} shares a tile with {1} on floor {2}'.format(
+                            e.name, seen.get(key), floor))
+                    seen[key] = e.name
+
     def test_connected_region_reaches_critical_entities(self):
         """The organic generator's core promise: the walkable region is ONE
         connected component, so the player can walk to the down-trail, the
@@ -126,13 +170,15 @@ class TestGameMap(unittest.TestCase):
 
     def test_go_down_and_up(self):
         log = MessageLog(32, 66, 6)
-        self.entities = self.game_map.go_down(self.player, log, CONSTANTS)
+        self.entities = self.game_map.go_down(self.player, log, CONSTANTS,
+                                              self.entities)
         self.assertEqual(self.game_map.dungeon_level, 2)
         self.assertTrue(self.player.fighter.hp > 0)
         ups = [e for e in self.entities if e.trail and e.trail.direction == 'up']
         self.assertEqual(len(ups), 1)
-        # back up
-        self.entities = self.game_map.go_up(self.player, log, CONSTANTS)
+        # back up (floor 1 is now CACHED, so this restores it)
+        self.entities = self.game_map.go_up(self.player, log, CONSTANTS,
+                                            self.entities)
         self.assertEqual(self.game_map.dungeon_level, 1)
         downs = [e for e in self.entities if e.trail and e.trail.direction == 'down']
         self.assertEqual(len(downs), 1)

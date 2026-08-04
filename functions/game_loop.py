@@ -32,7 +32,9 @@ from components.crafting import craft_item, RECIPES as CRAFT_RECIPES
 from functions.dialogue import get_dialogue, process_dialogue_choice
 from functions.render_functions import get_names_under_mouse
 from renderer import palette as C
-from functions.systems import passive_regen, wait_action, process_player_turn_results
+from functions.systems import (passive_regen, wait_action,
+                               process_player_turn_results, speed_free_action,
+                               tick_hunger)
 
 
 def _recompute_fov(game_map, player, constants):
@@ -61,9 +63,9 @@ def _handle_take(player, entities, game_map, message_log, constants):
             # dive to the 4.5 pocket (and its exit trail returns to 5).
             if entity.trail.direction == 'down':
                 return game_map.go_down(player, message_log, constants,
-                                        floor=entity.trail.floor)
+                                        entities, floor=entity.trail.floor)
             return game_map.go_up(player, message_log, constants,
-                                  floor=entity.trail.floor)
+                                  entities, floor=entity.trail.floor)
         elif entity.ship and entity.x == player.x and entity.y == player.y:
             if player.quest.found_count == 0:
                 message_log.add_message(Message(
@@ -371,14 +373,17 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
 
         # -------------------------------------------------- menu states
         if game_state == GameStates.SHOW_INVENTORY:
-            if right_click is not None and inventory_index is not None \
-                    and inventory_index < len(player.inventory.items):
-                context_item = player.inventory.items[inventory_index]
+            # inventory_index is a GROUP/letter position: stacks collapse to
+            # a single entry, so the letter resolves to the top item of that
+            # stack (menus.inventory_item_at) -- never a raw list index,
+            # which would select the wrong item behind a stack.
+            item = menus.inventory_item_at(player, inventory_index) \
+                if inventory_index is not None else None
+            if right_click is not None and item is not None:
+                context_item = item
                 previous_game_state = game_state
                 game_state = GameStates.ITEM_CONTEXT
-            elif inventory_index is not None \
-                    and inventory_index < len(player.inventory.items):
-                item = player.inventory.items[inventory_index]
+            elif item is not None:
                 player_turn_results.extend(player.inventory.use(
                     item, entities=entities, fov_map=fov_map, game_map=game_map,
                     noise_map=noise_map))
@@ -388,9 +393,9 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
                 game_state = GameStates.CRAFTING
 
         elif game_state == GameStates.DROP_INVENTORY:
-            if inventory_index is not None \
-                    and inventory_index < len(player.inventory.items):
-                item = player.inventory.items[inventory_index]
+            item = menus.inventory_item_at(player, inventory_index) \
+                if inventory_index is not None else None
+            if item is not None:
                 player_turn_results.extend(
                     player.inventory.drop_item(item, game_map, entities))
                 game_state = GameStates.ENEMY_TURN
@@ -569,110 +574,128 @@ def play_game(player, entities, game_map, message_log, game_state, renderer, con
 
         # ------------------------------------------------------- enemy turn
         if game_state == GameStates.ENEMY_TURN:
-            # Non-rest actions bleed the rest timer down slowly (2 per
-            # action) so a few waits can't be wiped out in one move, but
-            # honest play clears it. Waiting itself never decays it.
-            if not did_wait and wait_timer > 0:
-                wait_timer = max(0, wait_timer - 2)
-            # Per-floor easter-egg triggers (each fires once per floor).
-            if not getattr(game_map, 'land_dispute', False):
-                _maybe_land_dispute(game_map, entities, fov_map, message_log)
-            if not getattr(game_map, 'swooping', False):
-                _maybe_swooping(game_map, entities, message_log)
-            expired = player.fighter.tick_statuses()
-            for status in expired:
-                if status == 'speed':
-                    message_log.add_message(Message('Your speed boost wears off.', C.YELLOW))
-                elif status == 'poison_resist':
-                    message_log.add_message(Message('Your poison resistance fades.', C.YELLOW))
-                elif status == 'invisible':
-                    message_log.add_message(Message('You are no longer invisible.', C.YELLOW))
-                elif status == 'webbed':
-                    message_log.add_message(Message('You tear free of the sticky web.', C.LIGHT_GRAY))
-
-            for entity in entities:
-                if entity.ai:
-                    enemy_turn_results = entity.ai.take_turn(
-                        player, fov_map, game_map, entities, noise_map)
-
-                    for enemy_turn_result in enemy_turn_results:
-                        message = enemy_turn_result.get('message')
-                        dead_entity = enemy_turn_result.get('dead')
-                        hurt_entity = enemy_turn_result.get('hurt')
-                        webbed = enemy_turn_result.get('webbed')
-
-                        if message:
-                            message_log.add_message(message)
-
-                        if webbed and webbed.fighter:
-                            webbed.fighter.add_status('webbed',
-                                                      enemy_turn_result.get('turns', 1))
-                            message_log.add_message(Message(
-                                'You are caught in sticky spider web!', C.GREEN))
-
-                        if hurt_entity:
-                            # Group morale: nearby pack-mates react to a hurt
-                            # ally (timid scatter, dingoes hesitate, brutes enrage).
-                            for other in entities:
-                                if other is hurt_entity or not other.ai or not other.fighter:
-                                    continue
-                                if not isinstance(other.ai, HeuristicMonster) \
-                                        or not isinstance(hurt_entity.ai, HeuristicMonster):
-                                    continue
-                                if type(other.ai) is not type(hurt_entity.ai):
-                                    continue
-                                if other.distance_to(hurt_entity) > 6:
-                                    continue
-                                roll = randint(0, 100)
-                                if other.ai.FLEE_HP > 0.3 and roll < 30:
-                                    other.ai.state = FLEE
-                                    other.ai.state_turns = 0
-                                elif other.ai.PACK > 0 and roll < 40:
-                                    other.ai.slow_tick += 1  # hesitate a turn
-                                elif other.ai.CAUTION == 0 and roll < 50:
-                                    other.ai.state = HUNT
-                                    other.ai.state_turns = 0
-
-                        if dead_entity:
-                            if dead_entity == player:
-                                message, game_state = kill_player(dead_entity)
-                            else:
-                                # Capture name/AI before kill_monster nuls them.
-                                dead_name = dead_entity.name
-                                dead_ai = dead_entity.ai
-                                message, dropped_items = kill_monster(
-                                    dead_entity, game_map.dungeon_level)
-                                for dropped in dropped_items:
-                                    entities.append(dropped)
-                                    message_log.add_message(Message(
-                                        'The {0} dropped a {1}!'.format(
-                                            dead_name, dropped.name),
-                                        C.LIGHT_GREEN))
-
-                            message_log.add_message(message)
-
-                            if dead_entity is not player:
-                                # Morale on death: nearby allies react.
-                                for other in entities:
-                                    if other is dead_entity or not other.ai or not other.fighter:
-                                        continue
-                                    if not isinstance(other.ai, HeuristicMonster):
-                                        continue
-                                    if type(other.ai) is not type(dead_ai):
-                                        continue
-                                    if other.distance_to(dead_entity) > 6:
-                                        continue
-                                    if other.ai.FLEE_HP > 0.3:
-                                        other.ai.state = FLEE
-                                    elif other.ai.PACK > 0:
-                                        other.ai.slow_tick += 1  # hesitate
-                                    elif other.ai.CAUTION == 0:
-                                        other.ai.state = HUNT
-
-                            if game_state == GameStates.PLAYER_DEAD:
-                                break
-
-                    if game_state == GameStates.PLAYER_DEAD:
-                        break
-            else:
+            # Speed: while the boost is active, every second player action
+            # is a FREE action -- the whole enemy phase (and every timer,
+            # hunger included) is skipped, mirroring the monsters' SLOW
+            # parity pattern. Never skips a turn that ended in death,
+            # level-up, a menu state, or targeting: those never reach
+            # ENEMY_TURN.
+            if speed_free_action(player):
                 game_state = GameStates.PLAYERS_TURN
+                continue
+
+            # Hunger clock: one tick per completed player action. Hungry
+            # stops regeneration (see systems.py); starving drains HP
+            # through the normal death path.
+            if tick_hunger(player, message_log):
+                game_state = GameStates.PLAYER_DEAD
+
+            if game_state != GameStates.PLAYER_DEAD:
+                # Non-rest actions bleed the rest timer down slowly (2 per
+                # action) so a few waits can't be wiped out in one move, but
+                # honest play clears it. Waiting itself never decays it.
+                if not did_wait and wait_timer > 0:
+                    wait_timer = max(0, wait_timer - 2)
+                # Per-floor easter-egg triggers (each fires once per floor).
+                if not getattr(game_map, 'land_dispute', False):
+                    _maybe_land_dispute(game_map, entities, fov_map, message_log)
+                if not getattr(game_map, 'swooping', False):
+                    _maybe_swooping(game_map, entities, message_log)
+                expired = player.fighter.tick_statuses()
+                for status in expired:
+                    if status == 'speed':
+                        player._speed_tick = 0  # fresh parity window next boost
+                        message_log.add_message(Message('Your speed boost wears off.', C.YELLOW))
+                    elif status == 'poison_resist':
+                        message_log.add_message(Message('Your poison resistance fades.', C.YELLOW))
+                    elif status == 'invisible':
+                        message_log.add_message(Message('You are no longer invisible.', C.YELLOW))
+                    elif status == 'webbed':
+                        message_log.add_message(Message('You tear free of the sticky web.', C.LIGHT_GRAY))
+
+                for entity in entities:
+                    if entity.ai:
+                        enemy_turn_results = entity.ai.take_turn(
+                            player, fov_map, game_map, entities, noise_map)
+
+                        for enemy_turn_result in enemy_turn_results:
+                            message = enemy_turn_result.get('message')
+                            dead_entity = enemy_turn_result.get('dead')
+                            hurt_entity = enemy_turn_result.get('hurt')
+                            webbed = enemy_turn_result.get('webbed')
+
+                            if message:
+                                message_log.add_message(message)
+
+                            if webbed and webbed.fighter:
+                                webbed.fighter.add_status('webbed',
+                                                          enemy_turn_result.get('turns', 1))
+                                message_log.add_message(Message(
+                                    'You are caught in sticky spider web!', C.GREEN))
+
+                            if hurt_entity:
+                                # Group morale: nearby pack-mates react to a hurt
+                                # ally (timid scatter, dingoes hesitate, brutes enrage).
+                                for other in entities:
+                                    if other is hurt_entity or not other.ai or not other.fighter:
+                                        continue
+                                    if not isinstance(other.ai, HeuristicMonster) \
+                                            or not isinstance(hurt_entity.ai, HeuristicMonster):
+                                        continue
+                                    if type(other.ai) is not type(hurt_entity.ai):
+                                        continue
+                                    if other.distance_to(hurt_entity) > 6:
+                                        continue
+                                    roll = randint(0, 100)
+                                    if other.ai.FLEE_HP > 0.3 and roll < 30:
+                                        other.ai.state = FLEE
+                                        other.ai.state_turns = 0
+                                    elif other.ai.PACK > 0 and roll < 40:
+                                        other.ai.slow_tick += 1  # hesitate a turn
+                                    elif other.ai.CAUTION == 0 and roll < 50:
+                                        other.ai.state = HUNT
+                                        other.ai.state_turns = 0
+
+                            if dead_entity:
+                                if dead_entity == player:
+                                    message, game_state = kill_player(dead_entity)
+                                else:
+                                    # Capture name/AI before kill_monster nuls them.
+                                    dead_name = dead_entity.name
+                                    dead_ai = dead_entity.ai
+                                    message, dropped_items = kill_monster(
+                                        dead_entity, game_map.dungeon_level)
+                                    for dropped in dropped_items:
+                                        entities.append(dropped)
+                                        message_log.add_message(Message(
+                                            'The {0} dropped a {1}!'.format(
+                                                dead_name, dropped.name),
+                                            C.LIGHT_GREEN))
+
+                                message_log.add_message(message)
+
+                                if dead_entity is not player:
+                                    # Morale on death: nearby allies react.
+                                    for other in entities:
+                                        if other is dead_entity or not other.ai or not other.fighter:
+                                            continue
+                                        if not isinstance(other.ai, HeuristicMonster):
+                                            continue
+                                        if type(other.ai) is not type(dead_ai):
+                                            continue
+                                        if other.distance_to(dead_entity) > 6:
+                                            continue
+                                        if other.ai.FLEE_HP > 0.3:
+                                            other.ai.state = FLEE
+                                        elif other.ai.PACK > 0:
+                                            other.ai.slow_tick += 1  # hesitate
+                                        elif other.ai.CAUTION == 0:
+                                            other.ai.state = HUNT
+
+                                if game_state == GameStates.PLAYER_DEAD:
+                                    break
+
+                        if game_state == GameStates.PLAYER_DEAD:
+                            break
+                else:
+                    game_state = GameStates.PLAYERS_TURN

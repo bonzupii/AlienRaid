@@ -60,6 +60,11 @@ class GameMap:
         self.land_dispute = False     # cassowary vs kanga, once per floor
         self.swooping = False         # spring swoop, once per floor
         self.emu_war_memorial = False # floor 13 landmark pre-aggros emus
+        # Persistent floors: per-floor run cache keyed by floor number
+        # (int, or POCKET_FLOOR for 4.5). Snapshot on leaving, restore on
+        # revisit instead of regenerating. Serialized with the map by
+        # save_game/load_game (old saves get an empty cache via getattr).
+        self.floor_cache = {}
 
     # ------------------------------------------------------------- tile utils
     def idx(self, x, y):
@@ -85,15 +90,19 @@ class GameMap:
         return self.brush[self.idx(x, y)] != 0
 
     def _find_free_tile(self, x, y, entities):
-        """Nearest free tile to (x, y), used to place stairs/ship/parts."""
-        if not self.is_blocked(x, y) and not any(e.blocks and e.x == x and e.y == y
+        """Nearest tile to (x, y) that is walkable and EMPTY -- no other
+        entity at all, blocking or not. Landmarks, trails, the crashed
+        ship, parts and NPCs must never share a tile with each other: the
+        old 'only blocking entities' check let the ship (and anything else)
+        spawn on top of a non-blocking trail or item."""
+        if not self.is_blocked(x, y) and not any(e.x == x and e.y == y
                                                  for e in entities):
             return (x, y)
         for radius in range(1, 8):
             for dx in range(-radius, radius + 1):
                 for dy in range(-radius, radius + 1):
                     nx, ny = x + dx, y + dy
-                    if not self.is_blocked(nx, ny) and not any(e.blocks and e.x == nx and e.y == ny
+                    if not self.is_blocked(nx, ny) and not any(e.x == nx and e.y == ny
                                                                for e in entities):
                         return (nx, ny)
         return (x, y)
@@ -450,7 +459,10 @@ class GameMap:
 
     def place_entities(self, player, entities):
         """Scatter monsters/items on random reachable free tiles with a
-        minimum distance from the player and from each other."""
+        minimum distance from the player and from each other. Everything
+        lands on an EMPTY tile: the items pass skips tiles already taken
+        by a monster (the old code drew both passes from the same
+        pre-computed list, so an item could spawn on top of a monster)."""
         level = self.dungeon_level
         max_monsters = from_dungeon_level([[4, 1], [6, 4], [8, 7], [10, 10], [12, 14]], level)
         min_monsters = from_dungeon_level([[2, 1], [4, 4], [6, 7], [8, 10], [10, 14]], level)
@@ -462,12 +474,12 @@ class GameMap:
         item_chances = {name: from_dungeon_level(table, level)
                         for name, table in ITEM_TABLES.items()}
         seen = self._flood(player.x, player.y)
+        occupied = {(e.x, e.y) for e in entities}
         free = []
         for y in range(self.height):
             for x in range(self.width):
                 i = self.idx(x, y)
-                if not self.blocked[i] and seen[i] and \
-                        not any(e.x == x and e.y == y for e in entities):
+                if not self.blocked[i] and seen[i] and (x, y) not in occupied:
                     free.append((x, y))
         shuffle(free)
 
@@ -488,11 +500,14 @@ class GameMap:
                 monster.ai.state = HUNT
             entities.append(monster)
             placed.append((x, y))
+            occupied.add((x, y))
 
         placed = []
         for (x, y) in free:
             if len(placed) >= number_of_items:
                 break
+            if (x, y) in occupied:
+                continue
             if abs(x - player.x) + abs(y - player.y) < 4:
                 continue
             if any(abs(x - px) + abs(y - py) < 2 for (px, py) in placed):
@@ -500,6 +515,7 @@ class GameMap:
             choice = random_choice_from_dict(item_chances)
             entities.append(create_item(choice, level, x, y))
             placed.append((x, y))
+            occupied.add((x, y))
 
     # ----------------------------------------------- stairs / ship / quest
     def _place_stairs_and_quest(self, first_center, last_center, entities):
@@ -552,27 +568,96 @@ class GameMap:
             entities.append(part)
 
     # ------------------------------------------------------------ transitions
-    def go_down(self, player, message_log, constants, floor=None):
+    def _snapshot_floor(self, key, entities, player):
+        """Persist the current floor's full state (tiles + entities minus
+        the player) so a revisit restores it instead of regenerating."""
+        self.floor_cache[key] = {
+            'width': self.width,
+            'height': self.height,
+            'blocked': bytes(self.blocked),
+            'block_sight': bytes(self.block_sight),
+            'explored': bytes(self.explored),
+            'brush': bytes(self.brush),
+            'is_pocket': self.is_pocket,
+            'land_dispute': self.land_dispute,
+            'swooping': self.swooping,
+            'emu_war_memorial': self.emu_war_memorial,
+            'entities': [e for e in entities if e is not player],
+        }
+
+    def _restore_floor(self, player, message_log, constants, came_from_key,
+                       descended, key):
+        """Restore a previously visited floor from the run cache. The
+        player is placed on the back-trail (the one leading back to the
+        floor they came from), mirroring where a fresh spawn would put
+        them. A salvaged ship part stays salvaged, a killed monster stays
+        dead -- the cached entity list is the floor's live state."""
+        state = self.floor_cache[key]
+        self.width = state['width']
+        self.height = state['height']
+        self.blocked = bytearray(state['blocked'])
+        self.block_sight = bytearray(state['block_sight'])
+        self.explored = bytearray(state['explored'])
+        self.brush = bytearray(state['brush'])
+        self.version += 1
+        self.is_pocket = state['is_pocket']
+        self.land_dispute = state['land_dispute']
+        self.swooping = state['swooping']
+        self.emu_war_memorial = state['emu_war_memorial']
+        saved = state['entities']
+        entities = [player]
+        direction = 'up' if descended else 'down'
+        back_trail = next((e for e in saved
+                           if e.trail and e.trail.direction == direction
+                           and e.trail.floor == came_from_key), None)
+        if back_trail is not None:
+            player.x, player.y = back_trail.x, back_trail.y
+        else:
+            px, py = self._find_free_tile(self.width // 2, self.height // 2,
+                                          saved)
+            player.x, player.y = px, py
+        entities.extend(saved)
+        return entities
+
+    def go_down(self, player, message_log, constants, entities, floor=None):
         """Descend. ``floor`` comes from the trail being used (so the
-        mystery trail can dive to the 4.5 pocket); default is +1."""
+        mystery trail can dive to the 4.5 pocket); default is +1. The
+        floor being left is snapshotted into the run cache; a visited
+        destination is restored, a fresh one is generated."""
         target = floor if floor is not None else self.dungeon_level + 1
+        from_key = POCKET_FLOOR if self.is_pocket else self.dungeon_level
+        self._snapshot_floor(from_key, entities, player)
         if target == POCKET_FLOOR:
+            if POCKET_FLOOR in self.floor_cache:
+                return self._restore_floor(player, message_log, constants,
+                                           from_key, True, POCKET_FLOOR)
             return self._enter_pocket(player, message_log, constants)
         self.dungeon_level = target
         from loader_functions.initialize_new_game import biome_for_level
         constants.setdefault('colors', {}).update(biome_for_level(self.dungeon_level))
-        entities = self._new_level(player, message_log, constants, start_at='first', heal=True)
+        if target in self.floor_cache:
+            entities = self._restore_floor(player, message_log, constants,
+                                           from_key, True, target)
+        else:
+            entities = self._new_level(player, message_log, constants, start_at='first', heal=True)
         message_log.add_message(Message('You take the trail and descend into the darkness.', C.LIGHT_VIOLET))
         return entities
 
-    def go_up(self, player, message_log, constants, floor=None):
+    def go_up(self, player, message_log, constants, entities, floor=None):
         """Ascend. ``floor`` comes from the trail (the pocket's exit trail
-        returns to floor 5); default is -1."""
+        returns to floor 5); default is -1. Symmetric to go_down: snapshot
+        the floor being left, restore or generate the destination."""
         target = floor if floor is not None else self.dungeon_level - 1
+        from_key = POCKET_FLOOR if self.is_pocket else self.dungeon_level
+        self._snapshot_floor(from_key, entities, player)
         self.dungeon_level = target
         from loader_functions.initialize_new_game import biome_for_level
         constants.setdefault('colors', {}).update(biome_for_level(self.dungeon_level))
-        entities = self._new_level(player, message_log, constants, start_at='last', heal=False)
+        if target in self.floor_cache:
+            entities = self._restore_floor(player, message_log, constants,
+                                           from_key, False, target)
+        else:
+            entities = self._new_level(player, message_log, constants, start_at='last', heal=False)
         message_log.add_message(Message('You climb back toward the surface.', C.LIGHT_GREEN))
         return entities
 
@@ -621,6 +706,8 @@ class GameMap:
         self.make_map(constants['map_width'], constants['map_height'],
                       player, entities, start_at=start_at)
         if heal:
-            player.fighter.heal(player.fighter.max_hp // 2)
+            # Qwen balance pass: the descend-rest heals a tenth of max HP
+            # instead of half -- out-of-combat healing is slower now.
+            player.fighter.heal(player.fighter.max_hp // 10)
             message_log.add_message(Message('You take a moment to rest and recover your strength.', C.LIGHT_VIOLET))
         return entities

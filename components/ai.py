@@ -119,7 +119,12 @@ class HeuristicMonster:
         if not (target.fighter and target.fighter.hp > 0):
             return results
 
-        in_fov = _in_fov(fov_map, game_map, monster.x, monster.y)
+        # Invisibility (dropbear meat): the target cannot be VISUALLY
+        # tracked -- sight acquisition fails. Scent and hearing still work
+        # (SMELL branch below, noise in the dormant branch), and any
+        # already-stored last_seen persists until reached.
+        invisible = bool(target.fighter and target.fighter.has_status('invisible'))
+        in_fov = _in_fov(fov_map, game_map, monster.x, monster.y) and not invisible
         if in_fov:
             self.last_seen = (target.x, target.y)
         elif self.SMELL and self._can_smell(target) \
@@ -212,6 +217,12 @@ class HeuristicMonster:
 
     def _after_attack(self):
         pass
+
+    def _venom_damage(self, target, base):
+        """Venom damage after poison resistance: while active, halve it."""
+        if target.fighter and target.fighter.has_status('poison_resist'):
+            return max(1, base // 2)
+        return base
 
     # ------------------------------------------------------------ heuristics
     def _blocked_by(self, entities, x, y):
@@ -552,8 +563,11 @@ class TaipanAI(HeuristicMonster):
         self.spit_cooldown = max(0, self.spit_cooldown - 1)
         if self.spit_cooldown == 0 and 2 <= dist <= 5 and _line_of_sight(game_map, self.owner, target):
             self.spit_cooldown = 3
-            damage = int(self.owner.fighter.power * 0.7)
+            damage = self._venom_damage(target, int(self.owner.fighter.power * 0.7))
             results.append({'message': Message('The Taipan spits a stream of venom!', C.GREEN)})
+            if target.fighter and target.fighter.has_status('poison_resist'):
+                results.append({'message': Message(
+                    'Your poison resistance dulls the venom!', C.CYAN)})
             if damage > 0:
                 results.append({'message': Message('The venom burns {0} for {1} hit points!'.format(target.name, damage), C.WHITE)})
                 results.extend(target.fighter.take_damage(damage, attacker=self.owner))
@@ -697,9 +711,13 @@ class FunnelWebAI(HeuristicMonster):
     def _attack(self, target):
         results = []
         if randint(0, 100) < 40:
-            damage = int(self.owner.fighter.power * 1.3) - target.fighter.defense
+            damage = self._venom_damage(target, int(self.owner.fighter.power * 1.3)
+                                        - target.fighter.defense)
             results.append({'message': Message(
                 'The Funnel-web Spider sinks its fangs into {0}!'.format(target.name), C.GREEN)})
+            if target.fighter and target.fighter.has_status('poison_resist'):
+                results.append({'message': Message(
+                    'Your poison resistance dulls the venom!', C.CYAN)})
             if damage > 0:
                 results.append({'message': Message(
                     'The venom burns {0} for {1} hit points!'.format(target.name, damage), C.WHITE)})
@@ -852,9 +870,13 @@ class RedbackAI(HeuristicMonster):
     def _attack(self, target):
         results = []
         if randint(0, 100) < 50:
-            damage = int(self.owner.fighter.power * 1.4) - target.fighter.defense
+            damage = self._venom_damage(target, int(self.owner.fighter.power * 1.4)
+                                        - target.fighter.defense)
             results.append({'message': Message(
                 'The Redback Spider bites {0} and injects venom!'.format(target.name), C.GREEN)})
+            if target.fighter and target.fighter.has_status('poison_resist'):
+                results.append({'message': Message(
+                    'Your poison resistance dulls the venom!', C.CYAN)})
             if damage > 0:
                 results.append({'message': Message(
                     'The venom burns {0} for {1} hit points!'.format(target.name, damage), C.WHITE)})

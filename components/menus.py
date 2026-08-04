@@ -18,6 +18,7 @@ import textwrap
 
 import pygame
 
+from components.fighter import HUNGER_MAX, HUNGER_LABELS, hunger_tier
 from renderer import palette as C
 from components import crafting
 
@@ -102,6 +103,33 @@ def _wrap(header, width_tiles):
     return lines
 
 
+def inventory_groups(items):
+    """Group stacked inventory items by display name, preserving raw-list
+    order: [(name, rep_index, count)]. The menu letters AND the keyboard
+    hotkeys both index THIS list, so a stack of three med kits is ONE
+    hotkey and the letter always resolves to the top item of that stack."""
+    groups = []
+    for idx, item in enumerate(items):
+        for g in groups:
+            if g[0] == item.name:
+                g[2] += 1
+                break
+        else:
+            groups.append([item.name, idx, 1])
+    return groups
+
+
+def inventory_item_at(player, letter_index):
+    """Map a menu letter/hotkey (0-based GROUP position) to the top item of
+    that stack in the raw inventory list; None when out of range. This is
+    what keeps the lettered hotkeys aligned with the displayed menu even
+    when stacks collapse the list."""
+    groups = inventory_groups(player.inventory.items)
+    if 0 <= letter_index < len(groups):
+        return player.inventory.items[groups[letter_index][1]]
+    return None
+
+
 class Menu:
     """A drawable, clickable menu. Options may be strings or
     (text, color) tuples. ``actions`` parallels the options.
@@ -122,54 +150,53 @@ class Menu:
     def draw(self, surface, font, hover=-1, x=None, y=None,
              scroll=0, max_height=None):
         sw, sh = _center(surface)
-        wrapped = _wrap(self.header, self.width)
-        # Wrap every option (with its (a)/ (b)/... key prefix) so the text
-        # can never overrun the box; a wrapped option spans several rows but
-        # stays a single clickable entry.
+        frame_w = max(8, sw - 4)      # widest the box can be on this frame
+        # Header prose wraps cleanly at word boundaries. Menu OPTIONS are
+        # NEVER wrapped and NEVER elided: the box sizes itself to its
+        # longest line, so every entry is always shown in full.
+        wrapped = _wrap(self.header, frame_w)
         option_lines = []
         letter_index = ord('a')
         for option in self.options:
-            option_lines.append(_wrap('({0}) {1}'.format(chr(letter_index), option),
-                                      self.width))
+            option_lines.append('({0}) {1}'.format(chr(letter_index), option))
             letter_index += 1
-        content_rows = len(wrapped) + sum(len(lines) for lines in option_lines)
+        longest = 4
+        for line in wrapped:
+            longest = max(longest, len(line))
+        for line in option_lines:
+            longest = max(longest, len(line))
+        # Box width = longest line + 3-tile text inset + 1-tile margin.
+        # Clamped only so the box itself always fits on the frame; lines
+        # are drawn verbatim either way -- never truncated, never broken.
+        width = max(self.width, min(longest + 4, frame_w))
+        shown = option_lines
+
+        content_rows = len(wrapped) + len(shown)
         total = content_rows + 2  # +2 box padding rows
         height = total
         if max_height is not None:
             height = max(3, min(total, max_height))
         if x is None:
-            x = int(sw / 2 - self.width / 2)
+            x = int(sw / 2 - width / 2)
         if y is None:
             y = int(sh / 2 - height / 2)
         # Clamp the box fully inside the frame so menus can never be pushed
         # off-screen or overlap the frame edge.
-        x = max(1, min(x, max(1, sw - self.width - 1)))
+        x = max(1, min(x, max(1, sw - width - 1)))
         y = max(1, min(y, max(1, sh - height - 1)))
-        _draw_box(surface, x, y, self.width, height)
+        _draw_box(surface, x, y, width, height)
 
         viewport = height - 2                       # content rows visible
         max_scroll = max(0, content_rows - viewport)
         scroll = max(0, min(scroll, max_scroll))
 
-        # Build the flat content row list: (kind, opt_index, text, color, is_first)
+        # Flat content row list: (kind, opt_index, text, color).
         rows = []
         for line in wrapped:
-            rows.append((0, None, line, C.WHITE, False))
-        letter_index = ord('a')
-        for i, lines in enumerate(option_lines):
+            rows.append((0, None, line, C.WHITE))
+        for i, line in enumerate(shown):
             color = self.option_colors[i] if i < len(self.option_colors) else C.LIGHT_GRAY
-            first = True
-            for line in lines:
-                rows.append((1, i, line, color, first))
-                first = False
-            letter_index += 1
-
-        # Option block row ranges (content space) for click-rect alignment.
-        block_ranges = []
-        cursor = len(wrapped)
-        for lines in option_lines:
-            block_ranges.append((cursor, cursor + len(lines)))
-            cursor += len(lines)
+            rows.append((1, i, line, color))
 
         if scroll > 0:
             font.draw_text(surface, '▲', x + 1, y + 1, C.YELLOW)
@@ -177,28 +204,23 @@ class Menu:
             font.draw_text(surface, '▼', x + 1, y + height - 2, C.YELLOW)
 
         self.rects = []
-        for row_idx, (kind, opt_idx, text, color, is_first) in enumerate(rows):
+        for row_idx, (kind, opt_idx, text, color) in enumerate(rows):
             if row_idx < scroll or row_idx >= scroll + viewport:
                 continue
             ty = y + 1 + (row_idx - scroll)
             if kind == 0:
                 font.draw_text(surface, text, x + 1, ty, color)
             else:
-                if is_first and opt_idx == hover:
+                if opt_idx == hover:
                     font.draw_text(surface, '>', x + 1, ty, C.YELLOW)
                 line_color = C.WHITE if opt_idx == hover else color
                 font.draw_text(surface, text, x + 3, ty, line_color)
-
-        for i, (start, end) in enumerate(block_ranges):
-            vis_start = max(start, scroll)
-            vis_end = min(end, scroll + viewport)
-            if vis_start < vis_end:
-                rect_y = y + 1 + (vis_start - scroll)
                 self.rects.append(pygame.Rect(
-                    (x + 1) * TILE, rect_y * TILE,
-                    (self.width - 2) * TILE, (vis_end - vis_start) * TILE))
+                    (x + 1) * TILE, ty * TILE,
+                    (width - 2) * TILE, TILE))
         _register(self.rects, self.actions)
-        return (x, y, self.width, height)
+        self.width = width
+        return (x, y, width, height)
 
 
 def menu(surface, font, header, options, width, screen_width, screen_height,
@@ -228,26 +250,21 @@ def _equip_label(equipment, item):
 
 def inventory_menu(surface, font, header, player, inventory_width,
                    screen_width, screen_height, drop=False):
-    # Group identical items by name: (name, rep_index, count).
-    groups = []
-    for idx, item in enumerate(player.inventory.items):
-        for g in groups:
-            if g[0] == item.name:
-                g[2] += 1
-                break
-        else:
-            groups.append([item.name, idx, 1])
-
+    # One lettered hotkey per STACK (not per raw item): the menu letters
+    # and the keyboard hotkeys both index the group list, and the hotkey
+    # resolves to the top item of its stack (inventory_item_at). This keeps
+    # the letters aligned with what the menu displays.
+    groups = inventory_groups(player.inventory.items)
     equipment = player.equipment
     options = []
     actions = []
-    for name, rep, count in groups:
+    for i, (name, rep, count) in enumerate(groups):
         label = name
         if count > 1:
             label += ' x{0}'.format(count)
         label += _equip_label(equipment, player.inventory.items[rep])
         options.append(label)
-        actions.append({'inventory_index': rep})
+        actions.append({'inventory_index': i})  # letter/group position
     if not options:
         options = ['Inventory is empty.']
         actions = [None]
@@ -258,7 +275,7 @@ def inventory_menu(surface, font, header, player, inventory_width,
         # footer: craft button (also clickable)
         fy = y + h
         font.draw_text(surface, '[F5] craft parts', x + 1, fy, C.GOLD)
-        rect = pygame.Rect((x + 1) * TILE, fy * TILE, (inventory_width - 2) * TILE, TILE)
+        rect = pygame.Rect((x + 1) * TILE, fy * TILE, (w - 2) * TILE, TILE)
         _ACTIVE['rects'].append(rect)
         _ACTIVE['actions'].append({'crafting': True})
 
@@ -353,6 +370,9 @@ def character_screen(surface, font, player, width, height, screen_width, screen_
             player.level.experience_to_next_level),
         'Maximum HP: {0}   Current HP: {1}'.format(player.fighter.max_hp, player.fighter.hp),
         'Attack power: {0}   Defense: {1}'.format(player.fighter.power, player.fighter.defense),
+        'Hunger: {0}/{1} ({2})'.format(
+            getattr(player.fighter, 'hunger', HUNGER_MAX), HUNGER_MAX,
+            HUNGER_LABELS[hunger_tier(player.fighter)]),
         '--------',
     ]
     slots = [

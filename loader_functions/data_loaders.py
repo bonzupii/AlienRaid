@@ -48,6 +48,19 @@ def load_game():
 		message_log = data_file['message_log']
 		game_state = data_file['game_state']
 
+	# Single-use checkpoint: the save is CONSUMED on load so it can't be
+	# reloaded to retry a setback. Checkpoints ('s') and quit saves keep
+	# writing; kill_player is unchanged.
+	for suffix in ('', '.dir', '.bak'):
+		path = 'savegame.dat' + suffix
+		if os.path.isfile(path):
+			os.remove(path)
+
+	# Saves written before the persistent-floors change carry no floor
+	# cache; those start this run with an empty cache (every floor
+	# regenerates on first visit, as before).
+	game_map.floor_cache = getattr(game_map, 'floor_cache', {})
+
 	player = entities[player_index]
 
 	return player, entities, game_map, message_log, game_state
