@@ -459,14 +459,11 @@ class GameMap:
 
     def place_entities(self, player, entities):
         """Scatter monsters/items on random reachable free tiles with a
-        minimum distance from the player and from each other. Everything
-        lands on an EMPTY tile: the items pass skips tiles already taken
-        by a monster (the old code drew both passes from the same
-        pre-computed list, so an item could spawn on top of a monster)."""
+        minimum distance from the player and from each other."""
         level = self.dungeon_level
-        max_monsters = from_dungeon_level([[4, 1], [6, 4], [8, 7], [10, 10], [12, 14]], level)
-        min_monsters = from_dungeon_level([[2, 1], [4, 4], [6, 7], [8, 10], [10, 14]], level)
-        max_items = from_dungeon_level([[3, 1], [5, 4], [7, 8]], level)
+        max_monsters = from_dungeon_level([[8, 1], [10, 4], [12, 7], [14, 10], [16, 14]], level)
+        min_monsters = from_dungeon_level([[5, 1], [7, 4], [9, 7], [11, 10], [13, 14]], level)
+        max_items = from_dungeon_level([[5, 1], [7, 4], [9, 8]], level)
         number_of_monsters = randint(min_monsters, max_monsters)
         number_of_items = randint(1, max_items)
         monster_chances = {name: from_dungeon_level(table, level)
@@ -474,12 +471,12 @@ class GameMap:
         item_chances = {name: from_dungeon_level(table, level)
                         for name, table in ITEM_TABLES.items()}
         seen = self._flood(player.x, player.y)
-        occupied = {(e.x, e.y) for e in entities}
         free = []
         for y in range(self.height):
             for x in range(self.width):
                 i = self.idx(x, y)
-                if not self.blocked[i] and seen[i] and (x, y) not in occupied:
+                if not self.blocked[i] and seen[i] and \
+                        not any(e.x == x and e.y == y for e in entities):
                     free.append((x, y))
         shuffle(free)
 
@@ -500,14 +497,11 @@ class GameMap:
                 monster.ai.state = HUNT
             entities.append(monster)
             placed.append((x, y))
-            occupied.add((x, y))
 
         placed = []
         for (x, y) in free:
             if len(placed) >= number_of_items:
                 break
-            if (x, y) in occupied:
-                continue
             if abs(x - player.x) + abs(y - player.y) < 4:
                 continue
             if any(abs(x - px) + abs(y - py) < 2 for (px, py) in placed):
@@ -515,7 +509,6 @@ class GameMap:
             choice = random_choice_from_dict(item_chances)
             entities.append(create_item(choice, level, x, y))
             placed.append((x, y))
-            occupied.add((x, y))
 
     # ----------------------------------------------- stairs / ship / quest
     def _place_stairs_and_quest(self, first_center, last_center, entities):

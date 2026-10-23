@@ -15,6 +15,11 @@ from components.game_states import GameStates
 from functions.death_functions import kill_monster, kill_player
 from renderer import palette as C
 
+# Passive regen costs energy: each successful tick burns this much
+# satiety, and regen is disabled while satiety is below 80% of max.
+PASSIVE_REGEN_SATIETY_COST = 1
+PASSIVE_REGEN_MIN_SATIETY = int(HUNGER_MAX * 0.8)  # 480 of 600
+
 
 def _wearing(player, choice):
     """True if the player is wearing an equipped item with this choice."""
@@ -24,18 +29,22 @@ def _wearing(player, choice):
 
 def passive_regen(player, message_log):
     """Small chance to slowly regenerate a bit of HP while moving. Ned
-    Kelly's breastplate is too heavy to move-and-heal in, and hunger
-    stops regeneration entirely (Qwen balance pass: slower rate too --
-    1/40 proc, max_hp/300 step)."""
+    Kelly's breastplate is too heavy to move-and-heal in. Healing on the
+    move costs energy: each successful tick burns a little satiety, and
+    regen is disabled entirely while satiety is below 80% of max (you
+    need to be properly fed to mend). 1/50 proc, max_hp/300 step."""
     if _wearing(player, 'ned_kelly_breastplate'):
         return
-    if hunger_tier(player.fighter) != 'well-fed':
+    if getattr(player.fighter, 'hunger', HUNGER_MAX) < PASSIVE_REGEN_MIN_SATIETY:
         return
-    if randint(0, 39) != 39:
+    if randint(0, 49) != 49:
         return
     if player.fighter.hp >= player.fighter.max_hp:
         return
     step = max(1, round(player.fighter.max_hp / 300))
+    # A tick of healing burns a little food reserve.
+    player.fighter.hunger = max(0, getattr(player.fighter, 'hunger', HUNGER_MAX)
+                                - PASSIVE_REGEN_SATIETY_COST)
     if player.fighter.hp >= player.fighter.max_hp - step:
         player.fighter.hp = player.fighter.max_hp
         message_log.add_message(Message('Your wounds are completely healed!', C.GREEN))

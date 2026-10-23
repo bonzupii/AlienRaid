@@ -71,6 +71,30 @@ class TestCrafting(unittest.TestCase):
         self.assertEqual(player.inventory.items, before,
                          'failed craft must not consume anything')
 
+    def test_craft_taipan_meat_into_steak_and_antivenin(self):
+        """The good end of a taipan: the raw (poisonous) meat crafts into
+        safe food that heals, or a serum that grants poison resistance."""
+        player = make_player()
+        give(player, 'taipan_meat')
+        self.assertTrue(craftable(player)['taipan_steak'])
+        self.assertTrue(craftable(player)['taipan_antivenin'])
+
+        results = craft_item(player, 'taipan_steak', [], 1)
+        self.assertTrue(any(r.get('consumed') for r in results))
+        remaining = [i.item_choice for i in player.inventory.items]
+        self.assertEqual(remaining, ['taipan_steak'])
+        steak = player.inventory.items[0]
+        self.assertEqual(steak.item.function_kwargs.get('damage', 0), 0,
+                         'cooked steak must be safe')
+        self.assertGreater(steak.item.function_kwargs['heal'], 0,
+                           'cooked steak must heal')
+
+        give(player, 'taipan_meat')
+        results = craft_item(player, 'taipan_antivenin', [], 1)
+        self.assertTrue(any(r.get('consumed') for r in results))
+        remaining = [i.item_choice for i in player.inventory.items]
+        self.assertEqual(remaining, ['taipan_steak', 'taipan_antivenin'])
+
 
 if __name__ == '__main__':
     unittest.main()

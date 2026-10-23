@@ -7,7 +7,8 @@ from renderer import palette as C
 # Hunger clock (Qwen's roguelike-balance pass): the counter ticks down one
 # per player action. Generous thresholds; food feeds, medicine never does.
 HUNGER_MAX = 600       # starts full; a ration restores a chunk of this
-HUNGRY_AT = 300        # at/below: passive regen and rest-healing stop
+HUNGRY_AT = 300        # at/below: rest-healing stops (passive regen gates
+                       # separately at 80% satiety -- see systems.py)
 STARVING_AT = 120      # at/below: small HP drain each turn, can kill
 HUNGER_LABELS = {'well-fed': 'well fed', 'hungry': 'hungry',
                  'starving': 'STARVING'}

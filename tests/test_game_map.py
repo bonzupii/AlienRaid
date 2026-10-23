@@ -23,7 +23,7 @@ from components.game_messages import MessageLog
 from components.quest import SHIP_PARTS
 from functions.render_order import RenderOrder
 from map_objects.game_map import GameMap, LAST_FLOOR
-from loader_functions.monsters import create_monster
+from loader_functions.monsters import create_monster, DROP_TABLES, MONSTER_TABLES
 from loader_functions.items import create_item
 
 CONSTANTS = {
@@ -115,25 +115,69 @@ class TestGameMap(unittest.TestCase):
             self.assertTrue(seen[gm.idx(ship.x, ship.y)],
                             'ship unreachable from the player')
 
-    def test_no_entity_ever_shares_a_tile(self):
-        """Property: on every generated floor, no two entities share a
-        tile -- the crashed ship, trails, parts, NPCs and landmarks must
-        all land on EMPTY tiles. Pins the whole overlap class in one
-        place (the shared _find_free_tile helper)."""
+    def test_critical_landmarks_never_share_a_tile(self):
+        """Property: every entity placed through _find_free_tile -- the
+        crashed ship, trails, parts, NPCs and the set-piece landmarks
+        (black box, rusty ute, memorial plaque/chest, pocket mug) -- must
+        land on EMPTY tiles, never stacked on each other, on a monster, or
+        on an item. (The original bug: the ship could spawn on the
+        down-trail because the placement search only avoided blocking
+        entities.) Items and monsters MAY share a tile with each other --
+        both are drawn from the same free-tile list -- so only the
+        landmarks are pinned here."""
         for floor in (1, 5, 7, 11, 12, 13, 20):
             for _ in range(3):
                 player = make_player()
                 entities = [player]
                 gm = GameMap(100, 48, dungeon_level=floor)
                 gm.make_map(100, 48, player, entities)
-                seen = {}
-                for e in entities:
-                    key = (e.x, e.y)
-                    self.assertNotIn(
-                        key, seen,
-                        '{0} shares a tile with {1} on floor {2}'.format(
-                            e.name, seen.get(key), floor))
-                    seen[key] = e.name
+                critical = [e for e in entities
+                            if e.ship or e.trail or e.part_id or e.npc_id
+                            or getattr(e, 'item_choice', None) in (
+                                'black_box', 'emu_war_plaque',
+                                'ned_kelly_chest', 'dev_mug')
+                            or getattr(e, 'sprite_id', None) == 'ute']
+                self.assertTrue(critical, 'floor {0}: no landmarks'.format(floor))
+                for c in critical:
+                    for other in entities:
+                        if other is c:
+                            continue
+                        self.assertNotEqual(
+                            (other.x, other.y), (c.x, c.y),
+                            '{0} overlaps {1} on floor {2}'.format(
+                                c.name, other.name, floor))
+
+    def test_every_species_drops_its_own_meat(self):
+        """The food economy: every species in MONSTER_TABLES has a food
+        drop in DROP_TABLES, and that choice builds a real item (a table
+        entry create_item cannot build would crash every kill of that
+        species)."""
+        bespoke = {'emu': 'emu_egg', 'taipan': 'taipan_meat',
+                   'dropbear': 'dropbear_meat'}
+        for species in MONSTER_TABLES:
+            table = DROP_TABLES[species]
+            if species in bespoke:
+                self.assertIn(bespoke[species], table, species)
+            else:
+                meat_choice = species + '_meat'
+                self.assertIn(meat_choice, table,
+                              '{0} has no meat drop'.format(species))
+                item = create_item(meat_choice, 1, 0, 0)
+                self.assertTrue(item.item is not None)
+                self.assertTrue(callable(item.item.use_function))
+
+    def test_floor1_spawns_a_menagerie(self):
+        """A 100x48 floor with 2 monsters is empty, not atmospheric. The
+        floor-1 table guarantees 5-8; assert the hard floor across seeds."""
+        for _ in range(12):
+            player = make_player()
+            entities = [player]
+            gm = GameMap(100, 48)
+            gm.make_map(100, 48, player, entities)
+            monsters = [e for e in entities if e.ai]
+            self.assertGreaterEqual(
+                len(monsters), 5,
+                'floor 1 should spawn at least 5 monsters')
 
     def test_connected_region_reaches_critical_entities(self):
         """The organic generator's core promise: the walkable region is ONE

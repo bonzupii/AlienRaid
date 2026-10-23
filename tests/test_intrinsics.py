@@ -9,7 +9,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), os.pardir))
 
 from components.entity import Entity
 from components.fighter import Fighter
-from functions.item_functions import eat_emu_egg, eat_taipan_meat, eat_vegemite
+from functions.item_functions import eat_emu_egg, eat_vegemite
+from loader_functions.items import create_item
 
 
 class TestIntrinsics(unittest.TestCase):
@@ -21,12 +22,29 @@ class TestIntrinsics(unittest.TestCase):
         self.assertTrue(player.fighter.has_status('speed'))
         self.assertEqual(player.fighter.status['speed'], 10)
 
-    def test_taipan_meat_gives_poison_resistance(self):
+    def test_raw_taipan_meat_is_poison_but_food(self):
+        """Raw taipan meat bites back: it feeds but damages, and grants NO
+        poison resistance -- the good end comes from the crafted
+        antivenin (see components/crafting.py)."""
         player = Entity(0, 0, 'player', (0, 0, 0), 'Player',
                         fighter=Fighter(100, 10, 10))
-        results = eat_taipan_meat(player, 300)
+        player.fighter.hunger = 300
+        meat = create_item('taipan_meat', 1, 0, 0)
+        results = meat.item.use_function(player, **meat.item.function_kwargs)
+        self.assertTrue(any(r.get('consumed') for r in results))
+        self.assertEqual(player.fighter.hp, 60, 'raw taipan venom deals 40')
+        self.assertEqual(player.fighter.hunger, 480, 'it still feeds')
+        self.assertFalse(player.fighter.has_status('poison_resist'))
+
+    def test_taipan_antivenin_grants_poison_resistance(self):
+        player = Entity(0, 0, 'player', (0, 0, 0), 'Player',
+                        fighter=Fighter(100, 10, 10))
+        antivenin = create_item('taipan_antivenin', 1, 0, 0)
+        results = antivenin.item.use_function(
+            player, **antivenin.item.function_kwargs)
         self.assertTrue(any(r.get('consumed') for r in results))
         self.assertTrue(player.fighter.has_status('poison_resist'))
+        self.assertEqual(player.fighter.status['poison_resist'], 30)
 
     def test_status_tick_expires(self):
         player = Entity(0, 0, 'player', (0, 0, 0), 'Player',

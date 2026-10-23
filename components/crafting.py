@@ -21,6 +21,16 @@ RECIPES = {
         'ingredients': {'boomerang': 1, 'taipan_meat': 1},
         'desc': 'Craft a venom-laced blade from a Boomerang and Taipan Meat.',
     },
+    'taipan_steak': {
+        'name': 'Taipan Steak',
+        'ingredients': {'taipan_meat': 1},
+        'desc': 'Cook the raw taipan meat down into a safe, hearty steak.',
+    },
+    'taipan_antivenin': {
+        'name': 'Taipan Antivenin',
+        'ingredients': {'taipan_meat': 1},
+        'desc': 'Distill the taipan venom into a serum that grants poison resistance.',
+    },
     'dropbear_fur_vest': {
         'name': 'Dropbear Fur Vest',
         'ingredients': {'dropbear_meat': 1, 'whippy_willow_twig': 1},

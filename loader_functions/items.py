@@ -12,11 +12,11 @@ from functions.item_functions import (heal, morphine_pack, gain_xp,
                                       use_shock_charge, use_boomerang,
                                       use_didgeridoo, use_plasma_grenade,
                                       use_stun_grenade, use_ray_gun,
-                                      eat_emu_egg, eat_taipan_meat,
+                                      eat_emu_egg,
                                       eat_dropbear_meat, eat_vegemite,
-                                      use_neuralyzer, read_datalog,
+                                      eat_meat, use_neuralyzer, read_datalog,
                                       use_dads_thong, use_meat_pie, use_esky,
-                                      use_ned_kelly_chest)
+                                      use_ned_kelly_chest, use_antivenin)
 from renderer import palette as C
 
 # spawn tables: [chance, min_dungeon_level] pairs
@@ -26,9 +26,9 @@ ITEM_TABLES = {
     'med_kit':             [[5, 5], [20, 8], [30, 11], [20, 14], [10, 18]],
     'morphine_pack':       [[5, 4], [15, 6], [10, 9], [5, 12]],
     'golden_wattle_salve': [[0, 8], [8, 10], [12, 13], [10, 16]],
-    'vegemite_ration':     [[10, 1], [10, 3], [8, 6], [5, 9]],
-    'bush_tucker':         [[0, 3], [8, 5], [10, 8], [12, 11], [10, 15]],
-    'eucalyptus_tea':      [[8, 1], [10, 4], [8, 7]],
+    'vegemite_ration':     [[25, 1], [20, 3], [15, 6], [10, 9]],
+    'bush_tucker':         [[15, 1], [15, 3], [12, 6], [12, 9], [10, 13]],
+    'eucalyptus_tea':      [[12, 1], [12, 4], [10, 7]],
     'funnel_web_antivenom': [[0, 6], [10, 9], [10, 12]],
     'emu_egg':             [[0, 8], [8, 10], [8, 14]],
     'taipan_meat':         [[0, 6], [15, 9], [25, 12], [20, 15], [15, 19]],
@@ -42,7 +42,7 @@ ITEM_TABLES = {
     'dads_thong':          [[0, 6], [8, 10], [6, 14]],
     'didgeridoo':          [[0, 6], [8, 8], [10, 11]],
     'meat_pie':            [[0, 8], [6, 12]],
-    'tinny':               [[5, 1], [4, 3], [3, 6]],
+    'tinny':               [[8, 1], [6, 3], [4, 6]],
     'esky_of_holding':     [[0, 12], [6, 15]],
     'neuralyzer':          [[0, 11]],  # quest item: only placed by the AECD camp
     'mib_datalog':         [[0, 6], [5, 10]],
@@ -77,7 +77,17 @@ ITEM_DEFS = {
     'eucalyptus_tea':      ('icon_tea', (60, 120, 60), 'consume', {'use_function': heal, 'amount': 250}),
     'funnel_web_antivenom': ('icon_bottle', (60, 120, 60), 'consume', {'use_function': heal, 'amount': 400}),
     'emu_egg':             ('icon_ration', (245, 245, 235), 'consume', {'use_function': eat_emu_egg, 'amount': 550}),
-    'taipan_meat':         ('icon_ration', (139, 125, 60), 'consume', {'use_function': eat_taipan_meat, 'amount': 300}),
+    # Raw taipan meat is poison-but-food: it feeds but bites back. The
+    # good end of a taipan is CRAFTED -- safe steak or antivenin (see
+    # components/crafting.py).
+    'taipan_meat':         ('icon_ration', (139, 125, 60), 'consume',
+                            {'use_function': eat_meat, 'feed': 180,
+                             'damage': 40, 'meat': 'taipan meat'}),
+    'taipan_steak':        ('icon_ration', (190, 150, 90), 'consume',
+                            {'use_function': eat_meat, 'feed': 200,
+                             'heal': 300, 'meat': 'taipan steak'}),
+    'taipan_antivenin':    ('icon_bottle', (90, 200, 90), 'consume',
+                            {'use_function': use_antivenin, 'turns': 30}),
     'dropbear_meat':       ('icon_ration', C.DROPBEAR_GREY, 'consume', {'use_function': eat_dropbear_meat, 'amount': 400}),
     'plasma_grenade':      ('icon_grenade', C.CYAN, 'consume', {
         'use_function': use_plasma_grenade, 'targeting': True,
@@ -135,6 +145,7 @@ DISPLAY_NAMES = {
     'vegemite_ration': 'Vegemite Ration', 'bush_tucker': 'Bush Tucker',
     'eucalyptus_tea': 'Eucalyptus Tea', 'funnel_web_antivenom': 'Funnel-web Antivenom',
     'emu_egg': 'Emu Egg', 'taipan_meat': 'Taipan Meat',
+    'taipan_steak': 'Taipan Steak', 'taipan_antivenin': 'Taipan Antivenin',
     'dropbear_meat': 'Dropbear Meat', 'plasma_grenade': 'Plasma Grenade',
     'stun_grenade': 'Stun Grenade', 'shock_charge': 'Shock Charge',
     'ray_gun': 'Ray Gun', 'boomerang': 'Boomerang', 'dads_thong': "Dad's Thong",
@@ -153,6 +164,51 @@ DISPLAY_NAMES = {
     'dropbear_fur_vest': 'Dropbear Fur Vest', 'wombat_hide_cuirass': 'Wombat Hide Cuirass',
     'croc_hide_cuirass': 'Croc Hide Cuirass',
 }
+
+# Species meat: every monster drops its own meat (see DROP_TABLES in
+# loader_functions/monsters.py). FOOD, not medicine: meat feeds hunger and
+# does not heal -- medicine items heal. Each species' meat has a
+# temperament, encoded as (name, color, feed, damage):
+#   feed > 0  good meat            damage == 0
+#   feed < 0  vomit meat (hungrier) damage == 0
+#   feed == 0 poison meat           damage > 0
+#   feed > 0  poison-but-food       damage > 0
+# The three bespoke meats keep their own items and effects (emu egg,
+# taipan meat, dropbear meat). These are DROPS only; they are deliberately
+# absent from ITEM_TABLES so they never spawn on the ground.
+MEATS = {
+    # species:            display name,            color,        feed,  damage, heal
+    'kanga':          ('Kanga Meat',          (205, 133, 63),  200, 0, 0),
+    'joey':           ('Joey Meat',           (205, 133, 63),  150, 0, 0),
+    'wallaby':        ('Wallaby Meat',        (205, 133, 63),  180, 0, 0),
+    'wallaroo':       ('Wallaroo Meat',       (139, 90, 43),   200, 0, 0),
+    'tree_kanga':     ('Tree Kanga Meat',     (160, 82, 45),   200, 0, 0),
+    'dingo':          ('Dingo Meat',          (170, 120, 80),  180, 0, 0),
+    'goanna':         ('Goanna Meat',         (110, 130, 60),  180, 0, 0),
+    'killer_bee':     ('Killer Bee Meat',     (120, 90, 20),   60,  0, 100),  # small feed, small heal
+    'echidna':        ('Echidna Meat',        (120, 90, 60),   150, 0, 0),
+    'funnel_web':     ('Funnel-web Meat',     (60, 40, 40),    0,   40, 0),  # poison
+    'wombat':         ('Wombat Meat',         (90, 90, 90),    220, 0, 0),
+    'magpie':         ('Magpie Meat',         (70, 70, 75),    -60, 0, 0),  # stringy, vomit
+    'cassowary':      ('Cassowary Meat',      (90, 70, 140),   250, 0, 0),
+    'crocodile':      ('Crocodile Meat',      (60, 110, 70),   280, 0, 0),
+    'quokka':         ('Quokka Meat',         (180, 140, 100), 120, 0, 0),
+    'thorny_devil':   ('Thorny Devil Meat',   (160, 120, 80),  -50, 0, 0),  # spikes, vomit
+    'blue_tongue':    ('Blue-tongue Meat',    (100, 80, 60),   120, 0, 0),
+    'wedge_tailed_eagle': ('Wedge-tailed Eagle Meat', (90, 70, 50), 200, 0, 0),
+    'feral_camel':    ('Feral Camel Meat',    (200, 180, 140), 300, 0, 0),
+    'python':         ('Python Meat',         (110, 90, 60),   250, 0, 0),  # not venomous; plain food
+    'redback':        ('Redback Meat',        (60, 30, 30),    0,   60, 0),  # poison
+}
+
+for _species, (_name, _color, _food, _poison, _heal) in MEATS.items():
+    _choice = _species + '_meat'
+    _kwargs = {'use_function': eat_meat, 'feed': _food,
+               'damage': _poison, 'meat': _name.lower()}
+    if _heal:
+        _kwargs['heal'] = _heal
+    ITEM_DEFS[_choice] = ('icon_ration', _color, 'consume', _kwargs)
+    DISPLAY_NAMES[_choice] = _name
 
 
 def create_item(choice, dungeon_level, x, y):

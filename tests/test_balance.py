@@ -25,11 +25,12 @@ from components.game_states import GameStates
 from components.inventory import Inventory
 import functions.death_functions as death_mod
 from functions.death_functions import kill_player
-from functions.item_functions import eat_vegemite, morphine_pack
+from functions.item_functions import eat_vegemite, eat_meat, morphine_pack
 from functions.senses import NoiseMap
 from functions.systems import (passive_regen, wait_action, speed_free_action,
                                tick_hunger)
 from loader_functions.data_loaders import save_game, load_game
+from loader_functions.items import create_item
 from map_objects.game_map import GameMap, POCKET_FLOOR
 
 CONSTANTS = {'map_width': 100, 'map_height': 48}
@@ -99,13 +100,36 @@ class TestHungerClock(unittest.TestCase):
         player.fighter.hp = 100
         log = MessageLog(32, 66, 6)
         player.fighter.hunger = HUNGRY_AT
-        with mock.patch('functions.systems.randint', return_value=39):
+        with mock.patch('functions.systems.randint', return_value=49):
             passive_regen(player, log)
         self.assertEqual(player.fighter.hp, 100, 'hunger must gate regen')
         player.fighter.hunger = HUNGER_MAX
-        with mock.patch('functions.systems.randint', return_value=39):
+        with mock.patch('functions.systems.randint', return_value=49):
             passive_regen(player, log)
         self.assertGreater(player.fighter.hp, 100)
+
+    def test_passive_regen_disabled_below_eighty_percent_satiety(self):
+        player = make_player()
+        player.fighter.hp = 100
+        player.fighter.hunger = int(HUNGER_MAX * 0.8) - 1  # 479 of 600
+        log = MessageLog(32, 66, 6)
+        with mock.patch('functions.systems.randint', return_value=49):
+            passive_regen(player, log)
+        self.assertEqual(player.fighter.hp, 100,
+                         'regen must stop below 80% satiety')
+        self.assertEqual(player.fighter.hunger, int(HUNGER_MAX * 0.8) - 1,
+                         'a skipped tick must not cost satiety')
+
+    def test_passive_regen_tick_burns_satiety(self):
+        player = make_player()
+        player.fighter.hp = 100
+        player.fighter.hunger = HUNGER_MAX
+        log = MessageLog(32, 66, 6)
+        with mock.patch('functions.systems.randint', return_value=49):
+            passive_regen(player, log)
+        self.assertGreater(player.fighter.hp, 100, 'a successful tick must heal')
+        self.assertEqual(player.fighter.hunger, HUNGER_MAX - 1,
+                         'a regen tick must burn a little satiety')
 
     def test_hungry_stops_wait_healing(self):
         player = make_player()
@@ -289,6 +313,86 @@ class TestMorphineDisclaimer(unittest.TestCase):
         results = morphine_pack(player, amount=500)  # med kit path
         texts = [r.get('message', '').text for r in results if 'message' in r]
         self.assertFalse(any('Go with it' in t for t in texts))
+
+
+class TestMeatIsFoodNotMedicine(unittest.TestCase):
+    """Food feeds, medicine heals: generic species meat must never heal
+    (the killer bee meat and crafted taipan steak are the explicit
+    exceptions), and per-species meat temperament (vomit / poison /
+    poison-but-food) must be real."""
+
+    def test_good_meat_feeds_and_does_not_heal(self):
+        player = make_player()
+        player.fighter.hp = 500
+        player.fighter.hunger = 200
+        eat_meat(player, feed=180, meat='Wallaby Meat')
+        self.assertEqual(player.fighter.hunger, 380)
+        self.assertEqual(player.fighter.hp, 500,
+                         'food feeds; medicine heals')
+
+    def test_vomit_meat_makes_you_hungrier(self):
+        player = make_player()
+        player.fighter.hunger = 400
+        eat_meat(player, feed=-60, meat='Magpie Meat')
+        self.assertEqual(player.fighter.hunger, 340)
+
+    def test_poison_meat_damages_without_feeding(self):
+        player = make_player()
+        player.fighter.hunger = 400
+        results = eat_meat(player, feed=0, damage=60, meat='Redback Meat')
+        self.assertEqual(player.fighter.hunger, 400)
+        self.assertEqual(player.fighter.hp, 1250 - 60)
+        texts = [r.get('message', '').text for r in results if 'message' in r]
+        self.assertTrue(any('poison' in t for t in texts))
+
+    def test_raw_taipan_is_poison_but_food(self):
+        """Taipans are venomous: the raw meat feeds but bites back."""
+        player = make_player()
+        player.fighter.hunger = 300
+        meat = create_item('taipan_meat', 1, 0, 0)
+        meat.item.use_function(player, **meat.item.function_kwargs)
+        self.assertEqual(player.fighter.hunger, 480)
+        self.assertEqual(player.fighter.hp, 1250 - 40)
+
+    def test_hunger_clamps_at_zero(self):
+        player = make_player()
+        player.fighter.hunger = 30
+        eat_meat(player, feed=-60, meat='Magpie Meat')
+        self.assertEqual(player.fighter.hunger, 0)
+
+    def test_generated_meat_item_carries_its_temperament(self):
+        wallaby = create_item('wallaby_meat', 1, 0, 0)
+        self.assertEqual(wallaby.item.function_kwargs['feed'], 180)
+        self.assertEqual(wallaby.item.function_kwargs['damage'], 0)
+        redback = create_item('redback_meat', 1, 0, 0)
+        self.assertGreater(redback.item.function_kwargs['damage'], 0)
+        self.assertEqual(redback.item.function_kwargs['feed'], 0)
+        python = create_item('python_meat', 1, 0, 0)
+        self.assertEqual(python.item.function_kwargs['damage'], 0,
+                         'pythons are not venomous')
+        self.assertGreater(python.item.function_kwargs['feed'], 0)
+        bee = create_item('killer_bee_meat', 1, 0, 0)
+        self.assertEqual(bee.item.function_kwargs['heal'], 100)
+        self.assertGreater(bee.item.function_kwargs['feed'], 0,
+                           'killer bee meat still feeds')
+
+    def test_killer_bee_meat_feeds_and_heals(self):
+        player = make_player()
+        player.fighter.hp = 500
+        player.fighter.hunger = 200
+        bee = create_item('killer_bee_meat', 1, 0, 0)
+        bee.item.use_function(player, **bee.item.function_kwargs)
+        self.assertEqual(player.fighter.hunger, 260)
+        self.assertEqual(player.fighter.hp, 600)
+
+    def test_crafted_taipan_steak_is_safe_food_that_heals(self):
+        player = make_player()
+        player.fighter.hp = 500
+        player.fighter.hunger = 200
+        steak = create_item('taipan_steak', 1, 0, 0)
+        steak.item.use_function(player, **steak.item.function_kwargs)
+        self.assertEqual(player.fighter.hp, 800)
+        self.assertEqual(player.fighter.hunger, 400)
 
 
 class TestMenuBackdropRedesign(unittest.TestCase):

@@ -11,9 +11,12 @@ from renderer import palette as C
 
 
 def _feed(entity, amount):
-    """Food satisfies hunger; medicine never does (Qwen balance rule)."""
+    """Food satisfies hunger; medicine never does (Qwen balance rule).
+    Clamped to [0, HUNGER_MAX] so vomit-inducing meat (negative amount)
+    can't push the counter below zero."""
     fighter = entity.fighter
-    fighter.hunger = min(HUNGER_MAX, getattr(fighter, 'hunger', HUNGER_MAX) + amount)
+    h = getattr(fighter, 'hunger', HUNGER_MAX) + amount
+    fighter.hunger = max(0, min(HUNGER_MAX, h))
 
 
 def _in_fov(fov_map, game_map, x, y):
@@ -292,6 +295,46 @@ def use_ray_gun(entity, entities=None, fov_map=None, game_map=None, damage=80, m
     return results
 
 
+def eat_meat(entity, feed=150, damage=0, heal=0, meat='meat', entities=None,
+             fov_map=None, game_map=None, noise_map=None):
+    """Generic species meat. FOOD, not medicine -- it feeds hunger and does
+    not heal (medicine items heal; Qwen's food-vs-medicine rule). Meats
+    have a temperament, per species (see MEATS in loader_functions/items.py):
+      * good meat: plain feed (feed > 0),
+      * vomit meat: it makes you HUNGRIER (feed < 0),
+      * poison meat: damage, no nourishment (feed == 0, damage > 0),
+      * poison-but-food: damage yet still feeds (feed > 0, damage > 0),
+      * rare exceptions (killer bee, crafted taipan steak) also heal a
+        little (heal > 0) -- food that patches you up.
+    The bespoke emu egg and dropbear meat keep their own functions and
+    effects; raw taipan meat is poison-but-food and must be CRAFTED into
+    safe food or antivenin (see components/crafting.py)."""
+    results = []
+    _feed(entity, feed)
+    if feed > 0:
+        results.append({'consumed': True, 'message': Message(
+            'You eat the {0}. It hits the spot. (hunger eased)'.format(meat),
+            C.GREEN)})
+    elif feed < 0:
+        results.append({'consumed': True, 'message': Message(
+            'You eat the {0}. It makes you sick -- you vomit, and your '
+            'stomach is emptier than before.'.format(meat), C.YELLOW)})
+    else:
+        results.append({'consumed': True, 'message': Message(
+            'You eat the {0}. It tastes awful and gives you nothing.'.format(meat),
+            C.YELLOW)})
+    if heal > 0:
+        entity.fighter.heal(heal)
+        results.append({'message': Message(
+            'The {0} is surprisingly restorative. (+{1} HP)'.format(meat, heal),
+            C.GREEN)})
+    if damage > 0:
+        results.append({'message': Message(
+            'The {0} is poison. (-{1} HP)'.format(meat, damage), C.RED)})
+        results.extend(entity.fighter.take_damage(damage))
+    return results
+
+
 def eat_emu_egg(entity, amount=550, entities=None, fov_map=None, game_map=None, noise_map=None):
     """Emu egg: food + heal + a temporary speed boost."""
     results = []
@@ -303,14 +346,17 @@ def eat_emu_egg(entity, amount=550, entities=None, fov_map=None, game_map=None, 
     return results
 
 
-def eat_taipan_meat(entity, amount=300, entities=None, fov_map=None, game_map=None, noise_map=None):
-    """Taipan meat: food + heal + temporary poison resistance."""
+def use_antivenin(entity, turns=30, entities=None, fov_map=None, game_map=None,
+                  noise_map=None):
+    """Crafted taipan antivenin: grants poison resistance (venom damage is
+    halved while active). This is the good end of taipan meat -- the raw
+    meat is poison-but-food; the serum distilled from it is the cure."""
     results = []
-    entity.fighter.heal(amount)
-    _feed(entity, 180)
-    entity.fighter.add_status('poison_resist', 20)
+    entity.fighter.add_status('poison_resist', turns)
     results.append({'consumed': True,
-                    'message': Message('You eat the taipan meat. (poison resistance +20 turns)', C.GREEN)})
+                    'message': Message(
+                        'You drink the taipan antivenin. (poison resistance '
+                        '+{0} turns)'.format(turns), C.GREEN)})
     return results
 
 

@@ -71,19 +71,39 @@ TEMPLATES = {
     'redback':         {'hp': 6, 'power': 8.0, 'def': 0.7, 'xp': 2.5, 'min': 8, 'max': 14, 'color': (40, 20, 20)},
 }
 
-# species -> { item_choice: [[chance, min_level]] } dropped on death (Phase C)
+# species -> { item_choice: [[chance, min_level]] } dropped on death.
+# Three tiers, rolled independently per entry:    #   1. its own meat  -- the food economy: every kill can feed you
+    #      (emu/taipan/dropbear drop their bespoke food items instead),
+#   2. species-relevant loot (a wombat's hide, a kanga's boomerang),
+#   3. junk it has no business carrying (a wallaby with a warm tinny).
 DROP_TABLES = {
-    'emu':         {'emu_egg': [[100, 1]]},
-    'dropbear':    {'dropbear_meat': [[100, 1]]},
-    'taipan':      {'taipan_meat': [[100, 1]]},
-    'cassowary':   {'cassowary_crest_crown': [[100, 1]]},
-    'crocodile':   {'croc_hide_cuirass': [[100, 1]],
-                    'esky_of_holding': [[30, 1]]},
-    'killer_bee':  {'golden_wattle_salve': [[50, 1]]},
-    'dingo':       {'whippy_willow_twig': [[50, 1]]},
-    'wombat':      {'wombat_hide_cuirass': [[50, 1]]},
-    'echidna':     {'goanna_skin_hat': [[50, 1]]},
-    'kanga':       {'boomerang': [[50, 1]]},
+    'kanga':       {'kanga_meat': [[80, 1]], 'boomerang': [[40, 1]], 'tinny': [[4, 1]]},
+    'joey':        {'joey_meat': [[80, 1]], 'vegemite_ration': [[6, 1]]},
+    'wallaby':     {'wallaby_meat': [[80, 1]], 'tinny': [[5, 1]]},
+    'wallaroo':    {'wallaroo_meat': [[80, 1]], 'boomerang': [[20, 1]], 'tinny': [[4, 1]]},
+    'tree_kanga':  {'tree_kanga_meat': [[80, 1]], 'lesser_med_kit': [[6, 1]]},
+    'dingo':       {'dingo_meat': [[80, 1]], 'whippy_willow_twig': [[40, 1]], 'tinny': [[5, 1]]},
+    'goanna':      {'goanna_meat': [[80, 1]], 'shock_charge': [[12, 1]], 'tinny': [[4, 1]]},
+    'killer_bee':  {'killer_bee_meat': [[80, 1]], 'golden_wattle_salve': [[50, 1]], 'tinny': [[3, 1]]},
+    'dropbear':    {'dropbear_meat': [[100, 1]], 'dropbear_fur_vest': [[12, 4]],
+                    'dropbear_claw_gauntlet': [[12, 10]], 'tinny': [[3, 1]]},
+    'echidna':     {'echidna_meat': [[80, 1]], 'goanna_skin_hat': [[40, 1]], 'tinny': [[4, 1]]},
+    'taipan':      {'taipan_meat': [[100, 1]], 'taipan_fang_knife': [[20, 10]],
+                    'lesser_med_kit': [[6, 1]]},
+    'emu':         {'emu_egg': [[100, 1]], 'emu_feather_cap': [[30, 8]], 'tinny': [[3, 1]]},
+    'funnel_web':  {'funnel_web_meat': [[80, 1]], 'funnel_web_antivenom': [[15, 10]], 'tinny': [[3, 1]]},
+    'wombat':      {'wombat_meat': [[80, 1]], 'wombat_hide_cuirass': [[40, 8]], 'vegemite_ration': [[5, 1]]},
+    'magpie':      {'magpie_meat': [[80, 1]], 'tinny': [[6, 1]]},
+    'cassowary':   {'cassowary_meat': [[80, 1]], 'cassowary_crest_crown': [[40, 12]], 'tinny': [[3, 1]]},
+    'crocodile':   {'crocodile_meat': [[80, 1]], 'croc_hide_cuirass': [[50, 14]],
+                    'esky_of_holding': [[20, 14]], 'tinny': [[4, 1]]},
+    'quokka':      {'quokka_meat': [[80, 1]], 'tinny': [[8, 1]]},
+    'thorny_devil': {'thorny_devil_meat': [[80, 1]], 'tinny': [[4, 1]]},
+    'blue_tongue': {'blue_tongue_meat': [[80, 1]], 'tinny': [[4, 1]]},
+    'wedge_tailed_eagle': {'wedge_tailed_eagle_meat': [[80, 1]], 'goanna_skin_hat': [[15, 10]], 'tinny': [[3, 1]]},
+    'feral_camel': {'feral_camel_meat': [[80, 1]], 'reinforced_aluminite_brace': [[10, 12]], 'tinny': [[4, 1]]},
+    'python':      {'python_meat': [[80, 1]], 'tinny': [[4, 1]]},
+    'redback':     {'redback_meat': [[80, 1]], 'tinny': [[4, 1]]},
 }
 
 AI_CLASSES = {
